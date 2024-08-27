@@ -2,8 +2,8 @@ import random
 import time
 from abc import ABC, abstractmethod
 from particle import Particle
-from pymunk import Vec2d  # Add this import
-from typing import Tuple
+from pymunk import Vec2d, Space  # Add this import
+from typing import Tuple, List
 
 
 class Material(ABC):
@@ -17,7 +17,17 @@ class Material(ABC):
     @classmethod
     @abstractmethod
     def create_particle(cls, space, x, y):
-        pass
+        particle = Particle(
+            space,
+            x,
+            y,
+            cls.MASS,
+            cls.RADIUS,
+            cls.COLOR,
+            collision_type=cls.COLLISION_TYPE,
+            material=cls,  # Add this line
+        )
+        return particle
 
     @classmethod
     def create_particles(cls, space, x, y, count=10, spread=5):
@@ -37,6 +47,13 @@ class Material(ABC):
     @classmethod
     @abstractmethod
     def update_particle(cls, particle, dt, gravity: Tuple[float, float]):
+        pass
+
+    @classmethod
+    @abstractmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
         pass
 
 
@@ -65,15 +82,9 @@ class Rock(Material):
 
     @classmethod
     def create_particle(cls, space, x, y):
-        return Particle(
-            space,
-            x,
-            y,
-            cls.MASS,
-            cls.RADIUS,
-            cls.COLOR,
-            collision_type=cls.COLLISION_TYPE,
-        )
+        particle = super().create_particle(space, x, y)
+        # Add any Rock-specific properties here if needed
+        return particle
 
     @classmethod
     def create_particles(cls, space, x, y):
@@ -85,6 +96,12 @@ class Rock(Material):
         particle.body.velocity += Vec2d(*gravity) * dt
         return True
 
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        return []  # Rock doesn't react to collisions
+
 
 class Water(Fluid):
     COLOR = (0, 0, 255)
@@ -92,23 +109,32 @@ class Water(Fluid):
 
     @classmethod
     def create_particle(cls, space, x, y):
-        return Particle(
-            space,
-            x,
-            y,
-            cls.MASS,
-            cls.RADIUS,
-            cls.COLOR,
-            elasticity=1.0,
-            friction=0.0,
-            collision_type=cls.COLLISION_TYPE,
-        )
+        particle = super().create_particle(space, x, y)
+        particle.shape.elasticity = 0.9999
+        particle.shape.friction = 0.0
+        return particle
 
     @classmethod
     def update_particle(cls, particle, dt, gravity):
         # Water is fully affected by gravity
         particle.body.velocity += Vec2d(*gravity) * dt
         return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        if other_particle.material == Fire:
+            particle.to_remove = (
+                True  # Flag for removal instead of removing immediately
+            )
+            return [
+                Steam.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
+
+        return []
 
 
 class Fire(Fluid):
@@ -120,16 +146,8 @@ class Fire(Fluid):
 
     @classmethod
     def create_particle(cls, space, x, y):
-        particle = Particle(
-            space,
-            x,
-            y,
-            cls.MASS,
-            cls.RADIUS,
-            cls.COLOR,
-            collision_type=cls.COLLISION_TYPE,
-            lifetime=random.uniform(1, 2),
-        )
+        particle = super().create_particle(space, x, y)
+        particle.lifetime = random.uniform(1, 2)
         particle.body.velocity = Vec2d(
             random.uniform(-50, 50), random.uniform(-100, -50)
         )
@@ -157,6 +175,15 @@ class Fire(Fluid):
         particle.color = (255, int(255 * (1 - age / particle.lifetime)), 0)
         return True  # This signals that the particle should be kept
 
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        if isinstance(other_particle, Water):
+            space.remove(particle.body, particle.shape)
+            particle.to_remove = True
+        return []
+
 
 class Steam(Fluid):
     COLOR = (200, 200, 200, 200)
@@ -166,16 +193,8 @@ class Steam(Fluid):
 
     @classmethod
     def create_particle(cls, space, x, y):
-        particle = Particle(
-            space,
-            x,
-            y,
-            cls.MASS,
-            cls.RADIUS,
-            cls.COLOR,
-            lifetime=random.uniform(1, 3),
-            collision_type=cls.COLLISION_TYPE,
-        )
+        particle = super().create_particle(space, x, y)
+        particle.lifetime = random.uniform(1, 3)
         particle.body.velocity = Vec2d(random.uniform(-10, 10), random.uniform(-10, 10))
         particle.body.velocity_func = cls.update_velocity
         return particle
@@ -196,3 +215,9 @@ class Steam(Fluid):
         alpha = int(200 * (1 - age / particle.lifetime))
         particle.color = (*particle.color[:3], alpha)
         return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        return []  # Steam doesn't react to collisions

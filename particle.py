@@ -12,29 +12,27 @@ class Particle:
         mass,
         radius,
         color,
-        elasticity=0.1,
+        elasticity=0.5,
         friction=0.5,
         collision_type=0,
         lifetime=None,
-        gravity_scale=0.0,
+        material=None,
     ):
-        self.mass = mass
-        self.radius = radius
-        self.color = color
-        self.lifetime = lifetime
-        self.creation_time = time.time()
-
-        moment = pymunk.moment_for_circle(mass, 0, radius)
-        body = pymunk.Body(mass, moment)
-
-        body.position = x, y
-        body.gravity_scale = gravity_scale
-        self.body = body
+        self.radius = radius  # Add this line
+        self.body = pymunk.Body(
+            mass=mass, moment=pymunk.moment_for_circle(mass, 0, radius)
+        )
+        self.body.position = x, y
         self.shape = pymunk.Circle(self.body, radius)
         self.shape.elasticity = elasticity
         self.shape.friction = friction
         self.shape.collision_type = collision_type
-
+        self.color = color
+        self.creation_time = time.time()
+        self.lifetime = lifetime
+        self.body.particle = self  # Add this line
+        self.material = material
+        self.to_remove = False  # Add this line
         space.add(self.body, self.shape)
 
     def draw(self, window):

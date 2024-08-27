@@ -4,7 +4,7 @@ import pymunk.pygame_util
 import time
 from typing import List, Dict
 from particle import Particle
-from materials import Rock, Water, Fire, Steam, Material
+from materials import Rock, Water, Fire, Steam
 from ui import Button
 
 
@@ -64,29 +64,49 @@ class Simulation:
         ]
 
     def setup_collision_handler(self):
-        handler = self.space.add_collision_handler(2, 3)  # 2 for water, 3 for fire
-        handler.begin = self.handle_water_fire_collision
+        for i in range(2, 5):  # Collision types 2, 3, 4
+            for j in range(i + 1, 5):
+                handler = self.space.add_collision_handler(i, j)
+                handler.begin = self.handle_collision
 
-    def handle_water_fire_collision(self, arbiter, space, data):
-        water_shape, fire_shape = arbiter.shapes
-        water_body, fire_body = water_shape.body, fire_shape.body
+    def handle_collision(self, arbiter, space, data):
+        shape_a, shape_b = arbiter.shapes
+        particle_a = shape_a.body.particle
+        particle_b = shape_b.body.particle
 
-        self.space.remove(water_body, water_shape)
-        self.space.remove(fire_body, fire_shape)
+        new_particles = []
+        particles_to_remove = []
 
-        water_pos = water_body.position
-        for _ in range(1):
-            steam = Steam.create_particle(self.space, water_pos.x, water_pos.y)
-            self.particles["Steam"].append(steam)
+        new_particles.extend(
+            particle_a.material.handle_collision(space, particle_a, particle_b)
+        )
+        new_particles.extend(
+            particle_b.material.handle_collision(space, particle_b, particle_a)
+        )
 
-        self.particles["Water"] = [
-            p for p in self.particles["Water"] if p.body not in (water_body, fire_body)
-        ]
-        self.particles["Fire"] = [
-            p for p in self.particles["Fire"] if p.body not in (water_body, fire_body)
-        ]
+        # Check if particles should be removed
+        if particle_a.body not in space.bodies:
+            particles_to_remove.append(particle_a)
+        if particle_b.body not in space.bodies:
+            particles_to_remove.append(particle_b)
 
-        return False
+        # Remove particles from the simulation's particle lists
+        for particle in particles_to_remove:
+            material_name = particle.material.__name__
+            if material_name in self.particles:
+                self.particles[material_name] = [
+                    p for p in self.particles[material_name] if p != particle
+                ]
+
+        # Add new particles to the simulation
+        for new_particle in new_particles:
+            material_name = new_particle.material.__name__
+            if material_name in self.particles:
+                self.particles[material_name].append(new_particle)
+            else:
+                print(f"Warning: Unknown material {material_name}")
+
+        return True
 
     def run(self):
         running = True
@@ -135,6 +155,7 @@ class Simulation:
         self.last_update_time = current_time
 
         self.remove_out_of_bounds_particles()
+        self.remove_flagged_particles()  # Add this line
         self.update_particles(
             dt
         )  # Call this method to update and remove expired particles
@@ -205,4 +226,11 @@ class Simulation:
         font = pygame.font.Font(None, 36)
         total_particles = sum(len(particles) for particles in self.particles.values())
         text = font.render(f"Particles: {total_particles}", True, (0, 0, 0))
-        self.window.blit(text, (10, 10))
+        self.window.blit(text, (256, 10))
+
+    def remove_flagged_particles(self):
+        for material, particle_list in self.particles.items():
+            particles_to_remove = [p for p in particle_list if p.to_remove]
+            for particle in particles_to_remove:
+                self.space.remove(particle.body, particle.shape)
+                particle_list.remove(particle)

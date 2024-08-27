@@ -13,6 +13,8 @@ class Material(ABC):
     ELASTICITY = 0.1
     FRICTION = 0.5
     COLLISION_TYPE = 0
+    SPREAD = 5
+    VELOCITY_SPREAD = 10
 
     @classmethod
     @abstractmethod
@@ -25,21 +27,23 @@ class Material(ABC):
             cls.RADIUS,
             cls.COLOR,
             collision_type=cls.COLLISION_TYPE,
+            elasticity=cls.ELASTICITY,
+            friction=cls.FRICTION,
             material=cls,  # Add this line
         )
         return particle
 
     @classmethod
-    def create_particles(cls, space, x, y, count=10, spread=5):
+    def create_particles(cls, space, x, y, count=10):
         particles = []
         for _ in range(count):
-            px = x + random.uniform(-spread, spread)
-            py = y + random.uniform(-spread, spread)
+            px = x + random.uniform(-cls.SPREAD, cls.SPREAD)
+            py = y + random.uniform(-cls.SPREAD, cls.SPREAD)
             particle = cls.create_particle(space, px, py)
             if particle is not None:
                 particle.body.velocity = (
-                    random.uniform(-spread, spread),
-                    random.uniform(-spread, spread),
+                    random.uniform(-cls.VELOCITY_SPREAD, cls.VELOCITY_SPREAD),
+                    random.uniform(-cls.VELOCITY_SPREAD, cls.VELOCITY_SPREAD),
                 )
                 particles.append(particle)
         return particles
@@ -74,25 +78,27 @@ class Fluid(Material):
         return particles
 
 
-class Rock(Material):
+class Ball(Material):
     COLOR = (128, 128, 128)
     MASS = 200
     RADIUS = 30
     COLLISION_TYPE = 4
+    SPREAD = 0
+    VELOCITY_SPREAD = 0
 
     @classmethod
     def create_particle(cls, space, x, y):
         particle = super().create_particle(space, x, y)
-        # Add any Rock-specific properties here if needed
+        # Add any Ball-specific properties here if needed
         return particle
 
     @classmethod
     def create_particles(cls, space, x, y):
-        return super().create_particles(space, x, y, count=1, spread=0)
+        return super().create_particles(space, x, y, count=1)
 
     @classmethod
     def update_particle(cls, particle, dt, gravity):
-        # Rocks are fully affected by gravity
+        # Balls are fully affected by gravity
         particle.body.velocity += Vec2d(*gravity) * dt
         return True
 
@@ -100,34 +106,30 @@ class Rock(Material):
     def handle_collision(
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
-        return []  # Rock doesn't react to collisions
+        return []  # Ball doesn't react to collisions
 
 
 class Water(Fluid):
     COLOR = (0, 0, 255)
     COLLISION_TYPE = 2
+    RADIUS = 2
+    ELASTICITY = 0.9999
+    FRICTION = 0.0
 
     @classmethod
     def create_particle(cls, space, x, y):
-        particle = super().create_particle(space, x, y)
-        particle.shape.elasticity = 0.9999
-        particle.shape.friction = 0.0
-        return particle
+        return super().create_particle(space, x, y)
 
     @classmethod
     def update_particle(cls, particle, dt, gravity):
-        # Water is fully affected by gravity
-        particle.body.velocity += Vec2d(*gravity) * dt
         return True
 
     @classmethod
     def handle_collision(
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
-        if other_particle.material == Fire:
-            particle.to_remove = (
-                True  # Flag for removal instead of removing immediately
-            )
+        if other_particle.material == Fire or other_particle.material == Lava:
+            particle.to_remove = True
             return [
                 Steam.create_particle(
                     space, particle.body.position.x, particle.body.position.y
@@ -179,8 +181,7 @@ class Fire(Fluid):
     def handle_collision(
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
-        if isinstance(other_particle, Water):
-            space.remove(particle.body, particle.shape)
+        if other_particle.material == Water:
             particle.to_remove = True
         return []
 
@@ -190,19 +191,19 @@ class Steam(Fluid):
     MASS = 0.1
     RADIUS = 4
     COLLISION_TYPE = 4
+    VELOCITY_SPREAD = 100
 
     @classmethod
     def create_particle(cls, space, x, y):
         particle = super().create_particle(space, x, y)
         particle.lifetime = random.uniform(1, 3)
-        particle.body.velocity = Vec2d(random.uniform(-10, 10), random.uniform(-10, 10))
         particle.body.velocity_func = cls.update_velocity
         return particle
 
     @staticmethod
     def update_velocity(body, gravity, damping, dt):
         # Add jittery motion to steam
-        jitter = Vec2d(random.uniform(-2, 2), random.uniform(-2, 2))
+        jitter = Vec2d(body.velocity.x + random.uniform(-2, 2), -10)
         body.velocity = jitter - gravity * dt  # Counteract gravity
 
     @classmethod
@@ -221,3 +222,85 @@ class Steam(Fluid):
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
         return []  # Steam doesn't react to collisions
+
+
+class Gravel(Material):
+    COLOR = (139, 69, 19)  # Brown color
+    MASS = 5.0
+    RADIUS = 4
+    ELASTICITY = 0.2  # Low elasticity
+    FRICTION = 0.8  # High friction
+    COLLISION_TYPE = 5
+
+    @classmethod
+    def create_particle(cls, space, x, y):
+        return super().create_particle(space, x, y)
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        # Gravel is fully affected by gravity
+        particle.body.velocity += Vec2d(*gravity) * dt
+        return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        return []  # Gravel doesn't react to collisions
+
+
+class Sand(Material):
+    COLOR = (216, 216, 191)
+    MASS = 2.0
+    RADIUS = 3
+    COLLISION_TYPE = 6
+    FRICTION = 1.0
+    ELASTICITY = 0.1
+
+    @classmethod
+    def create_particle(cls, space, x, y):
+        particle = super().create_particle(space, x, y)
+        return particle
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        # Sand is fully affected by gravity
+        particle.body.velocity += Vec2d(*gravity) * dt
+        return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        return []
+
+
+class Lava(Fluid):
+    COLOR = (255, 0, 0)
+    MASS = 1.0
+    RADIUS = 3
+    COLLISION_TYPE = 3
+    FRICTION = 0.5
+    ELASTICITY = 0.1
+
+    @classmethod
+    def create_particle(cls, space, x, y):
+        return super().create_particle(space, x, y)
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        if other_particle.material == Water:
+            print("lava and water")
+            particle.to_remove = True
+            return [
+                Gravel.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
+        return []

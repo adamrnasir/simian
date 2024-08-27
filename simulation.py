@@ -4,7 +4,7 @@ import pymunk.pygame_util
 import time
 from typing import List, Dict
 from particle import Particle
-from materials import Rock, Water, Fire, Steam
+from materials import Ball, Water, Fire, Steam, Gravel, Sand, Lava
 from ui import Button
 
 
@@ -17,18 +17,24 @@ class Simulation:
         self.space.gravity = (0, 980)
         self.draw_options = pymunk.pygame_util.DrawOptions(window)
         self.particles: Dict[str, List[Particle]] = {
-            "Rock": [],
+            "Ball": [],
             "Water": [],
             "Fire": [],
             "Steam": [],
+            "Gravel": [],  # Add Gravel to particles dictionary
+            "Sand": [],  # Add Sand to particles dictionary
+            "Lava": [],  # Add Lava to particles dictionary
         }
         self.material_classes = {
-            "Rock": Rock,
+            "Ball": Ball,
             "Water": Water,
             "Fire": Fire,
             "Steam": Steam,
+            "Gravel": Gravel,  # Add Gravel to material_classes dictionary
+            "Sand": Sand,  # Add Sand to material_classes dictionary
+            "Lava": Lava,  # Add Lava to material_classes dictionary
         }
-        self.selected_material = "Rock"
+        self.selected_material = "Ball"
         self.create_walls()
         self.create_ui()
         self.setup_collision_handler()
@@ -57,15 +63,18 @@ class Simulation:
 
     def create_ui(self):
         self.buttons = [
-            Button(20, 20, 100, 40, "Rock", Rock.COLOR),
+            Button(20, 20, 100, 40, "Ball", Ball.COLOR),
             Button(20, 70, 100, 40, "Water", Water.COLOR),
             Button(20, 120, 100, 40, "Fire", Fire.COLOR),
             Button(20, 170, 100, 40, "Steam", Steam.COLOR),
+            Button(20, 220, 100, 40, "Gravel", Gravel.COLOR),  # Add Gravel button
+            Button(20, 270, 100, 40, "Sand", Sand.COLOR),  # Add Sand button
+            Button(20, 320, 100, 40, "Lava", Lava.COLOR),  # Add Lava button
         ]
 
     def setup_collision_handler(self):
-        for i in range(2, 5):  # Collision types 2, 3, 4
-            for j in range(i + 1, 5):
+        for i in range(2, 6):  # Update range to include Gravel's collision type (5)
+            for j in range(i + 1, 6):
                 handler = self.space.add_collision_handler(i, j)
                 handler.begin = self.handle_collision
 
@@ -132,7 +141,7 @@ class Simulation:
                     self.selected_material = button.text
                     return
 
-            if self.selected_material == "Rock":
+            if self.selected_material == "Ball":
                 self.create_particles(x, y)
             else:
                 self.stream_active = True
@@ -208,7 +217,7 @@ class Simulation:
                     self.particles[material] = []
 
     def draw(self):
-        self.window.fill((255, 255, 255))
+        self.window.fill((0, 0, 0))
         for particle_list in self.particles.values():
             for particle in particle_list:
                 particle.draw(self.window)

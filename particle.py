@@ -1,6 +1,7 @@
 import pygame
 import pymunk
 import time
+import math
 
 
 class Particle:
@@ -10,7 +11,7 @@ class Particle:
         x,
         y,
         mass,
-        radius,
+        size,
         color,
         elasticity=0.5,
         friction=0.5,
@@ -18,50 +19,42 @@ class Particle:
         lifetime=None,
         material=None,
     ):
-        self.radius = radius  # Add this line
+        self.size = size  # Change radius to size
         self.body = pymunk.Body(
-            mass=mass, moment=pymunk.moment_for_circle(mass, 0, radius)
+            mass=mass, moment=pymunk.moment_for_box(mass, (size, size))
         )
         self.body.position = x, y
-        self.shape = pymunk.Circle(self.body, radius)
+        self.shape = pymunk.Poly.create_box(self.body, (size, size))
         self.shape.elasticity = elasticity
         self.shape.friction = friction
         self.shape.collision_type = collision_type
         self.color = color
         self.creation_time = time.time()
         self.lifetime = lifetime
-        self.body.particle = self  # Add this line
+        self.body.particle = self
         self.material = material
-        self.to_remove = False  # Add this line
+        self.to_remove = False
         space.add(self.body, self.shape)
 
     def draw(self, window):
         position = self.body.position
+        angle = -self.body.angle  # Pymunk uses opposite rotation direction to Pygame
+
+        # Create a surface for the particle
+        surface = pygame.Surface((int(self.size), int(self.size)), pygame.SRCALPHA)
+        
+        # Draw the particle on the surface
         if isinstance(self.color, tuple) and len(self.color) == 4:
-            surface = pygame.Surface(
-                (int(self.radius * 2), int(self.radius * 2)), pygame.SRCALPHA
-            )
-            pygame.draw.rect(
-                surface,
-                self.color,
-                (
-                    int(self.radius),
-                    int(self.radius),
-                    int(self.radius),
-                    int(self.radius),
-                ),
-            )
-            window.blit(
-                surface, (int(position.x - self.radius), int(position.y - self.radius))
-            )
+            pygame.draw.rect(surface, self.color, (0, 0, int(self.size), int(self.size)))
         else:
-            pygame.draw.rect(
-                window,
-                self.color,
-                (
-                    int(position.x - self.radius),
-                    int(position.y - self.radius),
-                    int(self.radius * 2),
-                    int(self.radius * 2),
-                ),
-            )
+            pygame.draw.rect(surface, self.color, (0, 0, int(self.size), int(self.size)))
+
+        # Rotate the surface
+        rotated_surface = pygame.transform.rotate(surface, math.degrees(angle))
+        
+        # Get the new rect and calculate the position to blit
+        rot_rect = rotated_surface.get_rect()
+        blit_pos = (int(position.x - rot_rect.width / 2), int(position.y - rot_rect.height / 2))
+
+        # Draw the rotated surface
+        window.blit(rotated_surface, blit_pos)

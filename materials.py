@@ -4,12 +4,13 @@ from abc import ABC, abstractmethod
 from particle import Particle
 from pymunk import Vec2d, Space  # Add this import
 from typing import Tuple, List
+import pymunk
 
 
 class Material(ABC):
     COLOR = (0, 0, 0)
     MASS = 1.0
-    RADIUS = 5
+    SIZE = 10  # Change RADIUS to SIZE
     ELASTICITY = 0.1
     FRICTION = 0.5
     COLLISION_TYPE = 0
@@ -24,12 +25,12 @@ class Material(ABC):
             x,
             y,
             cls.MASS,
-            cls.RADIUS,
+            cls.SIZE,  # Change RADIUS to SIZE
             cls.COLOR,
             collision_type=cls.COLLISION_TYPE,
             elasticity=cls.ELASTICITY,
             friction=cls.FRICTION,
-            material=cls,  # Add this line
+            material=cls,
         )
         return particle
 
@@ -37,13 +38,13 @@ class Material(ABC):
     def create_particles(cls, space, x, y, count=10):
         particles = []
         for _ in range(count):
-            px = x + random.uniform(-cls.SPREAD, cls.SPREAD)
-            py = y + random.uniform(-cls.SPREAD, cls.SPREAD)
+            px = x + random.randint(-cls.SPREAD, cls.SPREAD) // 2 * 2
+            py = y + random.randint(-cls.SPREAD, cls.SPREAD) // 2 * 2
             particle = cls.create_particle(space, px, py)
             if particle is not None:
                 particle.body.velocity = (
-                    random.uniform(-cls.VELOCITY_SPREAD, cls.VELOCITY_SPREAD),
-                    random.uniform(-cls.VELOCITY_SPREAD, cls.VELOCITY_SPREAD),
+                    random.randint(-cls.VELOCITY_SPREAD, cls.VELOCITY_SPREAD) // 2 * 2,
+                    random.randint(-cls.VELOCITY_SPREAD, cls.VELOCITY_SPREAD) // 2 * 2,
                 )
                 particles.append(particle)
         return particles
@@ -81,7 +82,7 @@ class Fluid(Material):
 class Ball(Material):
     COLOR = (128, 128, 128)
     MASS = 200
-    RADIUS = 30
+    SIZE = 60  # Change RADIUS to SIZE and double the value
     COLLISION_TYPE = 4
     SPREAD = 0
     VELOCITY_SPREAD = 0
@@ -112,7 +113,7 @@ class Ball(Material):
 class Water(Fluid):
     COLOR = (0, 0, 255)
     COLLISION_TYPE = 2
-    RADIUS = 2
+    SIZE = 4  # Change RADIUS to SIZE
     ELASTICITY = 0.9999
     FRICTION = 0.0
 
@@ -225,7 +226,7 @@ class Steam(Fluid):
 
 
 class Gravel(Material):
-    COLOR = (139, 69, 19)  # Brown color
+    COLOR = (89, 69, 19)  # Brown color
     MASS = 5.0
     RADIUS = 4
     ELASTICITY = 0.2  # Low elasticity
@@ -246,7 +247,14 @@ class Gravel(Material):
     def handle_collision(
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
-        return []  # Gravel doesn't react to collisions
+        if other_particle.material == Fire:
+            particle.to_remove = True
+            return [
+                Lava.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
+        return []
 
 
 class Sand(Material):
@@ -296,10 +304,84 @@ class Lava(Fluid):
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
         if other_particle.material == Water:
-            print("lava and water")
             particle.to_remove = True
             return [
                 Gravel.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
+        return []
+
+
+class Paint(Material):
+    COLOR = (0, 255, 0)  # Default color (green), but we'll make it customizable
+    MASS = 100
+    SIZE = 6
+    COLLISION_TYPE = 7
+    FRICTION = 1.0  # Increase friction
+    ELASTICITY = 0.0  # Reduce elasticity to zero
+    SPREAD = 0
+    VELOCITY_SPREAD = 0
+
+    @classmethod
+    def create_particle(cls, space, x, y, color=None):
+        particle = super().create_particle(space, x, y)
+        particle.body.body_type = pymunk.Body.STATIC  # Make the body static
+        return particle
+
+    @classmethod
+    def create_particles(cls, space, x, y, count=1, color=None):
+        particles = []
+        for _ in range(count):
+            particle = cls.create_particle(space, x, y, color)
+            particles.append(particle)
+        return particles
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        # Paint particles don't need to be updated
+        return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        # Paint particles don't react to collisions
+        return []
+
+
+class Wood(Paint):
+    COLOR = (139, 69, 19)
+    MASS = 100
+    SIZE = 6
+    COLLISION_TYPE = 2
+    FRICTION = 1.0
+    ELASTICITY = 0.1
+    SPREAD = 0
+    VELOCITY_SPREAD = 0
+
+    @classmethod
+    def create_particle(cls, space, x, y, color=None):
+        return super().create_particle(space, x, y)
+
+    @classmethod
+    def create_particles(cls, space, x, y, count=1, color=None):
+        return super().create_particles(space, x, y, count, color)
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        return super().update_particle(particle, dt, gravity)
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        if (
+            other_particle.material == Fire or other_particle.material == Lava
+        ) and random.random() < 0.1:  # 10% chance to ignite
+            particle.to_remove = True
+            return [
+                Fire.create_particle(
                     space, particle.body.position.x, particle.body.position.y
                 )
             ]

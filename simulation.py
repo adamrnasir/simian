@@ -4,8 +4,19 @@ import pymunk.pygame_util
 import time
 from typing import List, Dict
 from particle import Particle
-from materials import Ball, Water, Fire, Steam, Gravel, Sand, Lava
+from materials import (
+    Ball,
+    Water,
+    Fire,
+    Steam,
+    Gravel,
+    Sand,
+    Lava,
+    Paint,
+    Wood,
+)  # Add Paint import
 from ui import Button
+import random
 
 
 class Simulation:
@@ -24,6 +35,8 @@ class Simulation:
             "Gravel": [],  # Add Gravel to particles dictionary
             "Sand": [],  # Add Sand to particles dictionary
             "Lava": [],  # Add Lava to particles dictionary
+            "Paint": [],  # Add Paint to particles dictionary
+            "Wood": [],  # Add Wood to particles dictionary
         }
         self.material_classes = {
             "Ball": Ball,
@@ -33,6 +46,8 @@ class Simulation:
             "Gravel": Gravel,  # Add Gravel to material_classes dictionary
             "Sand": Sand,  # Add Sand to material_classes dictionary
             "Lava": Lava,  # Add Lava to material_classes dictionary
+            "Paint": Paint,  # Add Paint to material_classes dictionary
+            "Wood": Wood,  # Add Wood to material_classes dictionary
         }
         self.selected_material = "Ball"
         self.create_walls()
@@ -41,6 +56,11 @@ class Simulation:
         self.stream_active = False
         self.stream_timer = 0
         self.last_update_time = time.time()
+        self.grid_size = 4  # Change grid size to match the smallest particle size
+        self.fire_spread_timer = 0
+        self.fire_spread_interval = 0.1  # Spread fire every 0.1 seconds
+        self.last_paint_position = None
+        self.max_paint_distance = 10  # Maximum distance between paint particles
 
     def create_walls(self):
         wall_thickness = 20
@@ -70,11 +90,13 @@ class Simulation:
             Button(20, 220, 100, 40, "Gravel", Gravel.COLOR),  # Add Gravel button
             Button(20, 270, 100, 40, "Sand", Sand.COLOR),  # Add Sand button
             Button(20, 320, 100, 40, "Lava", Lava.COLOR),  # Add Lava button
+            Button(20, 370, 100, 40, "Paint", Paint.COLOR),  # Add Paint button
+            Button(20, 420, 100, 40, "Wood", Wood.COLOR),  # Add Wood button
         ]
 
     def setup_collision_handler(self):
-        for i in range(2, 6):  # Update range to include Gravel's collision type (5)
-            for j in range(i + 1, 6):
+        for i in range(2, 8):  # Update range to include Paint's collision type (7)
+            for j in range(i + 1, 8):
                 handler = self.space.add_collision_handler(i, j)
                 handler.begin = self.handle_collision
 
@@ -82,6 +104,12 @@ class Simulation:
         shape_a, shape_b = arbiter.shapes
         particle_a = shape_a.body.particle
         particle_b = shape_b.body.particle
+
+        # If either particle is Paint, don't process the collision further
+        if isinstance(particle_a.material, Paint) or isinstance(
+            particle_b.material, Paint
+        ):
+            return True
 
         new_particles = []
         particles_to_remove = []
@@ -141,21 +169,75 @@ class Simulation:
                     self.selected_material = button.text
                     return
 
-            if self.selected_material == "Ball":
-                self.create_particles(x, y)
-            else:
-                self.stream_active = True
-                self.stream_timer = time.time()
+            self.stream_active = True
+            self.stream_timer = time.time()
+            self.last_paint_position = None
+            self.create_particles(x, y)
 
     def handle_mouse_up(self, event):
         if event.button == 1:  # Left mouse button
             self.stream_active = False
+            self.last_paint_position = None
 
     def create_particles(self, x, y):
         material_class = self.material_classes[self.selected_material]
-        new_particles = material_class.create_particles(self.space, x, y)
-        self.particles[self.selected_material].extend(
-            [p for p in new_particles if p is not None]
+        if issubclass(material_class, Paint):
+            self.create_paint_stroke(x, y, material_class)
+        else:
+            # Quantize the initial position
+            qx, qy = self.quantize_position(x, y)
+            new_particles = material_class.create_particles(self.space, qx, qy)
+
+            # Quantize the position of each new particle
+            for particle in new_particles:
+                if particle is not None:
+                    px, py = self.quantize_position(
+                        particle.body.position.x, particle.body.position.y
+                    )
+                    particle.body.position = pymunk.Vec2d(px, py)
+
+            self.particles[self.selected_material].extend(
+                [p for p in new_particles if p is not None]
+            )
+
+    def create_paint_stroke(self, end_x, end_y, material_class):
+        if self.last_paint_position is None:
+            self.last_paint_position = (end_x, end_y)
+            self.create_paint_particles(end_x, end_y, end_x, end_y, material_class)
+        else:
+            start_x, start_y = self.last_paint_position
+            distance = ((end_x - start_x) ** 2 + (end_y - start_y) ** 2) ** 0.5
+
+            if distance > self.max_paint_distance:
+                steps = int(distance / self.max_paint_distance)
+                for i in range(1, steps + 1):
+                    t = i / steps
+                    x = start_x + t * (end_x - start_x)
+                    y = start_y + t * (end_y - start_y)
+                    self.create_paint_particles(x, y, x, y, material_class)
+            else:
+                self.create_paint_particles(
+                    start_x, start_y, end_x, end_y, material_class
+                )
+
+        self.last_paint_position = (end_x, end_y)
+
+    def create_paint_particles(
+        self, start_x, start_y, end_x, end_y, material_class, num_particles=1
+    ):
+        for i in range(num_particles):
+            t = i / num_particles
+            x = start_x + t * (end_x - start_x)
+            y = start_y + t * (end_y - start_y)
+            qx, qy = self.quantize_position(x, y)
+            new_particles = material_class.create_particles(self.space, qx, qy, count=1)
+            self.particles[self.selected_material].extend(new_particles)
+
+    def quantize_position(self, x, y):
+        # Quantize the position to the nearest grid point
+        return (
+            round(x / self.grid_size) * self.grid_size,
+            round(y / self.grid_size) * self.grid_size,
         )
 
     def update(self):
@@ -164,16 +246,18 @@ class Simulation:
         self.last_update_time = current_time
 
         self.remove_out_of_bounds_particles()
-        self.remove_flagged_particles()  # Add this line
-        self.update_particles(
-            dt
-        )  # Call this method to update and remove expired particles
+        self.remove_flagged_particles()
+        self.update_particles(dt)
         self.limit_particles()
 
-        if self.stream_active and time.time() - self.stream_timer > 0.01:
+        self.fire_spread_timer += dt
+        if self.fire_spread_timer >= self.fire_spread_interval:
+            self.spread_fire()
+            self.fire_spread_timer = 0
+
+        if self.stream_active:
             x, y = pygame.mouse.get_pos()
             self.create_particles(x, y)
-            self.stream_timer = time.time()
 
     def remove_out_of_bounds_particles(self):
         for material, particle_list in self.particles.items():
@@ -243,3 +327,30 @@ class Simulation:
             for particle in particles_to_remove:
                 self.space.remove(particle.body, particle.shape)
                 particle_list.remove(particle)
+
+    def spread_fire(self):
+        new_fire_particles = []
+        for fire_particle in self.particles["Fire"]:
+            if random.random() < 0.1:  # 10% chance to spread fire
+                nearby_particles = self.find_nearby_particles(fire_particle, 20)
+                for nearby_particle in nearby_particles:
+                    if isinstance(nearby_particle.material, Wood):
+                        new_fire = Fire.create_particle(
+                            self.space,
+                            nearby_particle.body.position.x,
+                            nearby_particle.body.position.y,
+                        )
+                        new_fire_particles.append(new_fire)
+                        nearby_particle.to_remove = True
+
+        self.particles["Fire"].extend(new_fire_particles)
+
+    def find_nearby_particles(self, particle, radius):
+        nearby = []
+        for material, particle_list in self.particles.items():
+            for other in particle_list:
+                if other != particle:
+                    distance = particle.body.position.get_distance(other.body.position)
+                    if distance <= radius:
+                        nearby.append(other)
+        return nearby

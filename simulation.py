@@ -100,7 +100,7 @@ class Simulation:
 
     def setup_collision_handler(self):
         for i in range(2, 8):  # Update range to include Paint's collision type (7)
-            for j in range(i + 1, 8):
+            for j in range(2, 8):
                 handler = self.space.add_collision_handler(i, j)
                 handler.begin = self.handle_collision
 

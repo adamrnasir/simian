@@ -391,7 +391,7 @@ class Wood(Paint):
     ) -> List[Particle]:
         if (
             other_particle.material == Fire or other_particle.material == Lava
-        ) and random.random() < 0.5:  # 50% chance to ignite
+        ) and random.random() < 0.2:  # 20% chance to ignite
             particle.to_remove = True
             return [
                 Fire.create_particle(
@@ -408,7 +408,7 @@ class Glass(Paint):
     COLOR = (10, 20, 15)
     MASS = 100
     SIZE = 10
-    COLLISION_TYPE = 3
+    COLLISION_TYPE = 5
     FRICTION = 1.0
     ELASTICITY = 0.1
     SPREAD = 0
@@ -430,6 +430,15 @@ class Glass(Paint):
     def handle_collision(
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
+        if (
+            other_particle.material == Lava and random.random() < 0.1
+        ):  # 10% chance to turn into lava
+            particle.to_remove = True
+            return [
+                Lava.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
         return []
 
 

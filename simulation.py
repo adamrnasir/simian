@@ -14,6 +14,8 @@ from materials import (
     Lava,
     Paint,
     Wood,
+    Glass,
+    Acid,
 )  # Add Paint import
 from ui import UI
 import random
@@ -35,8 +37,9 @@ class Simulation:
             "Gravel": [],  # Add Gravel to particles dictionary
             "Sand": [],  # Add Sand to particles dictionary
             "Lava": [],  # Add Lava to particles dictionary
-            "Paint": [],  # Add Paint to particles dictionary
+            "Glass": [],  # Add Glass to particles dictionary
             "Wood": [],  # Add Wood to particles dictionary
+            "Acid": [],  # Add Acid to particles dictionary
         }
         self.material_classes = {
             "Ball": Ball,
@@ -46,8 +49,9 @@ class Simulation:
             "Gravel": Gravel,  # Add Gravel to material_classes dictionary
             "Sand": Sand,  # Add Sand to material_classes dictionary
             "Lava": Lava,  # Add Lava to material_classes dictionary
-            "Paint": Paint,  # Add Paint to material_classes dictionary
+            "Glass": Glass,  # Add Glass to material_classes dictionary
             "Wood": Wood,  # Add Wood to material_classes dictionary
+            "Acid": Acid,  # Add Acid to material_classes dictionary
         }
         self.ui = UI(window, width, height, self.space)
         self.create_ui()
@@ -88,8 +92,9 @@ class Simulation:
             "Gravel": Gravel.COLOR,
             "Sand": Sand.COLOR,
             "Lava": Lava.COLOR,
-            "Paint": Paint.COLOR,
+            "Glass": Glass.COLOR,
             "Wood": Wood.COLOR,
+            "Acid": Acid.COLOR,
         }
         self.ui.create_buttons(materials)
 
@@ -289,17 +294,16 @@ class Simulation:
             start_x, start_y = self.ui.last_paint_position
             distance = ((end_x - start_x) ** 2 + (end_y - start_y) ** 2) ** 0.5
 
-            if distance > self.max_paint_distance:
-                steps = int(distance / self.max_paint_distance)
-                for i in range(1, steps + 1):
-                    t = i / steps
-                    x = start_x + t * (end_x - start_x)
-                    y = start_y + t * (end_y - start_y)
-                    self.create_paint_particles(x, y, x, y, material_class)
-            else:
-                self.create_paint_particles(
-                    start_x, start_y, end_x, end_y, material_class
-                )
+            # Increase the number of particles created along the stroke
+            num_particles = max(
+                int(distance / 2), 1
+            )  # Create a particle every 2 pixels
+
+            for i in range(num_particles):
+                t = i / num_particles
+                x = start_x + t * (end_x - start_x)
+                y = start_y + t * (end_y - start_y)
+                self.create_paint_particles(x, y, x, y, material_class)
 
         self.ui.last_paint_position = (float(end_x), float(end_y))
 
@@ -311,6 +315,11 @@ class Simulation:
             x = start_x + t * (end_x - start_x)
             y = start_y + t * (end_y - start_y)
             qx, qy = self.quantize_position(x, y)
+
+            # Add some randomness to create a more natural-looking stroke
+            qx += random.uniform(-self.grid_size / 2, self.grid_size / 2)
+            qy += random.uniform(-self.grid_size / 2, self.grid_size / 2)
+
             new_particles = material_class.create_particles(self.space, qx, qy, count=1)
             self.particles[self.ui.selected_material].extend(new_particles)
 

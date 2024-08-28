@@ -82,7 +82,7 @@ class Fluid(Material):
 class Ball(Material):
     COLOR = (128, 128, 128)
     MASS = 200
-    SIZE = 60  # Change RADIUS to SIZE and double the value
+    SIZE = 20  # Change RADIUS to SIZE and double the value
     COLLISION_TYPE = 4
     SPREAD = 0
     VELOCITY_SPREAD = 0
@@ -114,7 +114,7 @@ class Water(Fluid):
     COLOR = (0, 0, 255)
     COLLISION_TYPE = 2
     SIZE = 4  # Change RADIUS to SIZE
-    ELASTICITY = 0.9999
+    ELASTICITY = 0.98
     FRICTION = 0.0
 
     @classmethod
@@ -204,7 +204,7 @@ class Steam(Fluid):
     @staticmethod
     def update_velocity(body, gravity, damping, dt):
         # Add jittery motion to steam
-        jitter = Vec2d(body.velocity.x + random.uniform(-2, 2), -10)
+        jitter = Vec2d(body.velocity.x + random.uniform(-2, 2), -20)
         body.velocity = jitter - gravity * dt  # Counteract gravity
 
     @classmethod
@@ -226,7 +226,7 @@ class Steam(Fluid):
 
 
 class Gravel(Material):
-    COLOR = (89, 69, 19)  # Brown color
+    COLOR = (89, 89, 89)  # Brown color
     MASS = 5.0
     RADIUS = 4
     ELASTICITY = 0.2  # Low elasticity
@@ -254,6 +254,9 @@ class Gravel(Material):
                     space, particle.body.position.x, particle.body.position.y
                 )
             ]
+        elif other_particle.material == Acid:
+            particle.to_remove = True
+            return []
         return []
 
 
@@ -280,6 +283,16 @@ class Sand(Material):
     def handle_collision(
         cls, space: Space, particle: Particle, other_particle: Particle
     ) -> List[Particle]:
+        if other_particle.material == Fire or other_particle.material == Lava:
+            particle.to_remove = True
+            return [
+                Glass.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
+        elif other_particle.material == Acid:
+            particle.to_remove = True
+            return []
         return []
 
 
@@ -382,6 +395,72 @@ class Wood(Paint):
             particle.to_remove = True
             return [
                 Fire.create_particle(
+                    space, particle.body.position.x, particle.body.position.y
+                )
+            ]
+        elif other_particle.material == Acid:
+            particle.to_remove = True
+            return []
+        return []
+
+
+class Glass(Paint):
+    COLOR = (10, 20, 15)
+    MASS = 100
+    SIZE = 10
+    COLLISION_TYPE = 3
+    FRICTION = 1.0
+    ELASTICITY = 0.1
+    SPREAD = 0
+    VELOCITY_SPREAD = 0
+
+    @classmethod
+    def create_particle(cls, space, x, y, color=None):
+        return super().create_particle(space, x, y)
+
+    @classmethod
+    def create_particles(cls, space, x, y, count=1, color=None):
+        return super().create_particles(space, x, y, count, color)
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        return super().update_particle(particle, dt, gravity)
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        return []
+
+
+class Acid(Fluid):
+    COLOR = (0, 255, 0)
+    MASS = 1.0
+    SIZE = 4
+    COLLISION_TYPE = 4
+    FRICTION = 0.0
+    ELASTICITY = 0.98
+
+    @classmethod
+    def create_particle(cls, space, x, y):
+        return super().create_particle(space, x, y)
+
+    @classmethod
+    def update_particle(cls, particle, dt, gravity):
+        return True
+
+    @classmethod
+    def handle_collision(
+        cls, space: Space, particle: Particle, other_particle: Particle
+    ) -> List[Particle]:
+        if (
+            other_particle.material == Water
+            or other_particle.material == Fire
+            or other_particle.material == Lava
+        ):
+            particle.to_remove = True
+            return [
+                Steam.create_particle(
                     space, particle.body.position.x, particle.body.position.y
                 )
             ]

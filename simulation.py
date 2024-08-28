@@ -15,7 +15,7 @@ from materials import (
     Paint,
     Wood,
 )  # Add Paint import
-from ui import Button
+from ui import UI
 import random
 
 
@@ -49,17 +49,15 @@ class Simulation:
             "Paint": Paint,  # Add Paint to material_classes dictionary
             "Wood": Wood,  # Add Wood to material_classes dictionary
         }
-        self.selected_material = "Ball"
-        self.create_walls()
+        self.ui = UI(window, width, height, self.space)
         self.create_ui()
+        self.create_walls()
         self.setup_collision_handler()
-        self.stream_active = False
         self.stream_timer = 0
         self.last_update_time = time.time()
         self.grid_size = 4  # Change grid size to match the smallest particle size
         self.fire_spread_timer = 0
         self.fire_spread_interval = 0.1  # Spread fire every 0.1 seconds
-        self.last_paint_position = None
         self.max_paint_distance = 10  # Maximum distance between paint particles
 
     def create_walls(self):
@@ -82,17 +80,18 @@ class Simulation:
         self.space.add(body, *walls)
 
     def create_ui(self):
-        self.buttons = [
-            Button(20, 20, 100, 40, "Ball", Ball.COLOR),
-            Button(20, 70, 100, 40, "Water", Water.COLOR),
-            Button(20, 120, 100, 40, "Fire", Fire.COLOR),
-            Button(20, 170, 100, 40, "Steam", Steam.COLOR),
-            Button(20, 220, 100, 40, "Gravel", Gravel.COLOR),  # Add Gravel button
-            Button(20, 270, 100, 40, "Sand", Sand.COLOR),  # Add Sand button
-            Button(20, 320, 100, 40, "Lava", Lava.COLOR),  # Add Lava button
-            Button(20, 370, 100, 40, "Paint", Paint.COLOR),  # Add Paint button
-            Button(20, 420, 100, 40, "Wood", Wood.COLOR),  # Add Wood button
-        ]
+        materials = {
+            "Ball": Ball.COLOR,
+            "Water": Water.COLOR,
+            "Fire": Fire.COLOR,
+            "Steam": Steam.COLOR,
+            "Gravel": Gravel.COLOR,
+            "Sand": Sand.COLOR,
+            "Lava": Lava.COLOR,
+            "Paint": Paint.COLOR,
+            "Wood": Wood.COLOR,
+        }
+        self.ui.create_buttons(materials)
 
     def setup_collision_handler(self):
         for i in range(2, 8):  # Update range to include Paint's collision type (7)
@@ -148,97 +147,16 @@ class Simulation:
     def run(self):
         running = True
         while running:
-            for event in pygame.event.get():
+            events = pygame.event.get()
+            for event in events:
                 if event.type == pygame.QUIT:
                     running = False
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    self.handle_mouse_down(event)
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    self.handle_mouse_up(event)
 
+            self.ui.handle_events(events)
             self.update()
             self.draw()
             pygame.display.flip()
             self.space.step(1 / 60.0)
-
-    def handle_mouse_down(self, event):
-        if event.button == 1:  # Left mouse button
-            x, y = event.pos
-            for button in self.buttons:
-                if button.rect.collidepoint(x, y):
-                    self.selected_material = button.text
-                    return
-
-            self.stream_active = True
-            self.stream_timer = time.time()
-            self.last_paint_position = None
-            self.create_particles(x, y)
-
-    def handle_mouse_up(self, event):
-        if event.button == 1:  # Left mouse button
-            self.stream_active = False
-            self.last_paint_position = None
-
-    def create_particles(self, x, y):
-        material_class = self.material_classes[self.selected_material]
-        if issubclass(material_class, Paint):
-            self.create_paint_stroke(x, y, material_class)
-        else:
-            # Quantize the initial position
-            qx, qy = self.quantize_position(x, y)
-            new_particles = material_class.create_particles(self.space, qx, qy)
-
-            # Quantize the position of each new particle
-            for particle in new_particles:
-                if particle is not None:
-                    px, py = self.quantize_position(
-                        particle.body.position.x, particle.body.position.y
-                    )
-                    particle.body.position = pymunk.Vec2d(px, py)
-
-            self.particles[self.selected_material].extend(
-                [p for p in new_particles if p is not None]
-            )
-
-    def create_paint_stroke(self, end_x, end_y, material_class):
-        if self.last_paint_position is None:
-            self.last_paint_position = (end_x, end_y)
-            self.create_paint_particles(end_x, end_y, end_x, end_y, material_class)
-        else:
-            start_x, start_y = self.last_paint_position
-            distance = ((end_x - start_x) ** 2 + (end_y - start_y) ** 2) ** 0.5
-
-            if distance > self.max_paint_distance:
-                steps = int(distance / self.max_paint_distance)
-                for i in range(1, steps + 1):
-                    t = i / steps
-                    x = start_x + t * (end_x - start_x)
-                    y = start_y + t * (end_y - start_y)
-                    self.create_paint_particles(x, y, x, y, material_class)
-            else:
-                self.create_paint_particles(
-                    start_x, start_y, end_x, end_y, material_class
-                )
-
-        self.last_paint_position = (end_x, end_y)
-
-    def create_paint_particles(
-        self, start_x, start_y, end_x, end_y, material_class, num_particles=1
-    ):
-        for i in range(num_particles):
-            t = i / num_particles
-            x = start_x + t * (end_x - start_x)
-            y = start_y + t * (end_y - start_y)
-            qx, qy = self.quantize_position(x, y)
-            new_particles = material_class.create_particles(self.space, qx, qy, count=1)
-            self.particles[self.selected_material].extend(new_particles)
-
-    def quantize_position(self, x, y):
-        # Quantize the position to the nearest grid point
-        return (
-            round(x / self.grid_size) * self.grid_size,
-            round(y / self.grid_size) * self.grid_size,
-        )
 
     def update(self):
         current_time = time.time()
@@ -255,8 +173,8 @@ class Simulation:
             self.spread_fire()
             self.fire_spread_timer = 0
 
-        if self.stream_active:
-            x, y = pygame.mouse.get_pos()
+        if self.ui.stream_active:
+            x, y = self.ui.get_mouse_position()
             self.create_particles(x, y)
 
     def remove_out_of_bounds_particles(self):
@@ -305,21 +223,8 @@ class Simulation:
         for particle_list in self.particles.values():
             for particle in particle_list:
                 particle.draw(self.window)
-        for button in self.buttons:
-            button.draw(self.window)
-        self.draw_selected_material()
-        self.draw_particle_count()
-
-    def draw_selected_material(self):
-        for button in self.buttons:
-            if button.text == self.selected_material:
-                pygame.draw.rect(self.window, (255, 255, 0), button.rect, 3)
-
-    def draw_particle_count(self):
-        font = pygame.font.Font(None, 36)
         total_particles = sum(len(particles) for particles in self.particles.values())
-        text = font.render(f"Particles: {total_particles}", True, (0, 0, 0))
-        self.window.blit(text, (256, 10))
+        self.ui.draw(total_particles)
 
     def remove_flagged_particles(self):
         for material, particle_list in self.particles.items():
@@ -354,3 +259,64 @@ class Simulation:
                     if distance <= radius:
                         nearby.append(other)
         return nearby
+
+    def create_particles(self, x, y):
+        material_class = self.material_classes[self.ui.selected_material]
+        if issubclass(material_class, Paint):
+            self.create_paint_stroke(x, y, material_class)
+        else:
+            # Quantize the initial position
+            qx, qy = self.quantize_position(x, y)
+            new_particles = material_class.create_particles(self.space, qx, qy)
+
+            # Quantize the position of each new particle
+            for particle in new_particles:
+                if particle is not None:
+                    px, py = self.quantize_position(
+                        particle.body.position.x, particle.body.position.y
+                    )
+                    particle.body.position = pymunk.Vec2d(px, py)
+
+            self.particles[self.ui.selected_material].extend(
+                [p for p in new_particles if p is not None]
+            )
+
+    def create_paint_stroke(self, end_x, end_y, material_class):
+        if self.ui.last_paint_position is None:
+            self.ui.last_paint_position = (float(end_x), float(end_y))
+            self.create_paint_particles(end_x, end_y, end_x, end_y, material_class)
+        else:
+            start_x, start_y = self.ui.last_paint_position
+            distance = ((end_x - start_x) ** 2 + (end_y - start_y) ** 2) ** 0.5
+
+            if distance > self.max_paint_distance:
+                steps = int(distance / self.max_paint_distance)
+                for i in range(1, steps + 1):
+                    t = i / steps
+                    x = start_x + t * (end_x - start_x)
+                    y = start_y + t * (end_y - start_y)
+                    self.create_paint_particles(x, y, x, y, material_class)
+            else:
+                self.create_paint_particles(
+                    start_x, start_y, end_x, end_y, material_class
+                )
+
+        self.ui.last_paint_position = (float(end_x), float(end_y))
+
+    def create_paint_particles(
+        self, start_x, start_y, end_x, end_y, material_class, num_particles=1
+    ):
+        for i in range(num_particles):
+            t = i / num_particles
+            x = start_x + t * (end_x - start_x)
+            y = start_y + t * (end_y - start_y)
+            qx, qy = self.quantize_position(x, y)
+            new_particles = material_class.create_particles(self.space, qx, qy, count=1)
+            self.particles[self.ui.selected_material].extend(new_particles)
+
+    def quantize_position(self, x, y):
+        # Quantize the position to the nearest grid point
+        return (
+            round(x / self.grid_size) * self.grid_size,
+            round(y / self.grid_size) * self.grid_size,
+        )

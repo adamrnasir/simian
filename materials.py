@@ -378,7 +378,7 @@ class Wood(Paint):
     ) -> List[Particle]:
         if (
             other_particle.material == Fire or other_particle.material == Lava
-        ) and random.random() < 0.1:  # 10% chance to ignite
+        ) and random.random() < 0.5:  # 50% chance to ignite
             particle.to_remove = True
             return [
                 Fire.create_particle(

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import random
 from copy import deepcopy
+import math
 
 GRAVITY = 1.0
 
@@ -59,21 +60,32 @@ class Particle(Material):
             else:
                 other_material = get_material(new_grid[target_y, target_x])
                 reaction_result = self.react(other_material)
-                if reaction_result.id != self.id:
+                if isinstance(reaction_result, tuple):
+                    # Handle the case where two materials are produced
+                    new_grid[target_y, target_x] = reaction_result[0].id
+                    new_grid[y, x] = reaction_result[1].id
+                elif reaction_result.id != self.id:
                     new_grid[target_y, target_x] = reaction_result.id
                     new_grid[y, x] = Air.id
-                elif other_material.density < self.density:
+                elif other_material.density < self.density and issubclass(
+                    other_material.__class__, Fluid
+                ):
                     self.displace(new_grid, x, y, target_x, target_y)
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
 
     def calculate_movement(self, grid, x, y):
-        surrounding_density = self.get_surrounding_density(grid, x, y)
-        min_fall_speed = int((self.density / surrounding_density) * GRAVITY)
-        max_fall_speed = int((self.density / surrounding_density) * GRAVITY) + 1
-        fall_speed = random.randint(min_fall_speed, max(min_fall_speed, max_fall_speed))
-
         dx = random.randint(-1, 1)
+        surrounding_density = self.get_surrounding_density(grid, x, y)
+
+        if self.density <= surrounding_density:
+            return 1, 0  # Particle floats or sits on top
+
+        density_ratio = self.density / surrounding_density
+
+        # Use arctangent function to map density ratio to fall speed
+        fall_speed = int(1 + 2 * math.atan(density_ratio - 1) / math.pi)
+
         return fall_speed, dx
 
     def get_surrounding_density(self, grid, x, y):
@@ -117,7 +129,9 @@ class Particle(Material):
                 if target == Air.id:
                     self.move(new_grid, x, y, nx, ny)
                     break
-                elif get_material(target).density < self.density:
+                elif get_material(target).density < self.density and issubclass(
+                    get_material(target).__class__, Fluid
+                ):
                     self.displace(new_grid, x, y, nx, ny)
                     break
 
@@ -178,7 +192,7 @@ class Water(Fluid):
 
     def react(self, other_material):
         if isinstance(other_material, Lava):
-            return Steam()
+            return (Stone(), Steam())
         return self
 
 
@@ -207,7 +221,11 @@ class Steam(Fluid):
             else:
                 other_material = get_material(new_grid[target_y, target_x])
                 reaction_result = self.react(other_material)
-                if reaction_result.id != self.id:
+                if isinstance(reaction_result, tuple):
+                    # Handle the case where two materials are produced
+                    new_grid[target_y, target_x] = reaction_result[0].id
+                    new_grid[y, x] = reaction_result[1].id
+                elif reaction_result.id != self.id:
                     new_grid[target_y, target_x] = reaction_result.id
                     new_grid[y, x] = Air.id
                 elif other_material.density > self.density:
@@ -215,7 +233,10 @@ class Steam(Fluid):
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
         else:
-            self.try_move_diagonally(new_grid, x, y, width, height)
+            if random.random() < 0.5:
+                self.try_move_diagonally(new_grid, x, y, width, height)
+            else:
+                self.end_of_life(new_grid, x, y)
 
     def react(self, other_material):
         if isinstance(other_material, Water):
@@ -238,7 +259,7 @@ class Lava(Fluid):
 
     def react(self, other_material):
         if isinstance(other_material, Water):
-            return Stone()  # Lava cools and turns into stone when it touches water
+            return (Stone(), Steam())
         return self
 
 

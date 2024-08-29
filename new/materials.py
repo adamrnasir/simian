@@ -260,6 +260,8 @@ class Lava(Fluid):
     def react(self, other_material):
         if isinstance(other_material, Water):
             return (Stone(), Steam())
+        elif isinstance(other_material, Stone):
+            return (Lava(), Steam())
         return self
 
 
@@ -269,6 +271,11 @@ class Stone(Powder):
     friction = 0.9
     elasticity = 0.1
     mass = 2.5
+
+    def react(self, other_material):
+        if isinstance(other_material, Lava):
+            return (Lava(), Stone())
+        return self
 
 
 # Dictionary to map material IDs to their respective classes

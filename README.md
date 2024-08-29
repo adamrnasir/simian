@@ -1,6 +1,6 @@
 # SIMIAN
 
-A pair of [Powder Game 2](https://dan-ball.jp/en/javagame/dust2/) - inspired particle sims.
+A pair of [Powder Game 2](https://dan-ball.jp/en/javagame/dust2/) - inspired particle sims built for fun in a few hours.
 
 The `old` sim uses `pymunk` and simulates particles as rigid bodies.
 

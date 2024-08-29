@@ -9,10 +9,6 @@ GRAVITY = 1.0
 class Material(ABC):
     id = None
     density = 0.1
-    lifespan = None  # Default lifespan is None (infinite)
-
-    def __init__(self):
-        self.age = 0
 
     @abstractmethod
     def update(self, grid, x, y, new_grid):
@@ -44,11 +40,6 @@ class Particle(Material):
     mass = 1.0
 
     def update(self, grid, x, y, new_grid):
-        self.age += 1
-        if self.lifespan is not None and self.age > self.lifespan:
-            self.end_of_life(new_grid, x, y)
-            return
-
         height, width = grid.shape
         if y < height - 1:
             fall_speed, dx = self.calculate_movement(grid, x, y)
@@ -201,14 +192,8 @@ class Steam(Fluid):
     density = 0.5
     viscosity = 0.1
     mass = 0.5
-    lifespan = 60  # Steam lasts for 100 update cycles
 
     def update(self, grid, x, y, new_grid):
-        self.age += 1
-        if self.lifespan is not None and self.age > self.lifespan:
-            self.end_of_life(new_grid, x, y)
-            return
-
         # Steam rises
         height, width = grid.shape
         if y > 0:

@@ -2,13 +2,25 @@ import pygame
 from simulation import Simulation
 from render import Renderer
 from materials import Sand, Water, Lava, Steam, Stone
-# import cProfile
-
-# import pstats
 import asyncio
 
 # Add this constant at the top of the file
 GRID_SIZE = 100  # Increase this value for a larger grid
+
+
+# Add this new class for the GUI
+class MaterialButton:
+    def __init__(self, x, y, width, height, material, color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.material = material
+        self.color = color
+
+    def draw(self, window):
+        pygame.draw.rect(window, self.color, self.rect)
+        font = pygame.font.Font(None, 24)
+        text_surface = font.render(self.material.__name__, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        window.blit(text_surface, text_rect)
 
 
 def main():
@@ -25,10 +37,13 @@ def main():
     clock = pygame.time.Clock()
     running = True
 
-    # Create a Profile object
-    # pr = cProfile.Profile()
+    # Create material buttons using colors from the renderer
+    materials = [Sand, Water, Lava, Steam, Stone]
+    buttons = []
+    for i, material in enumerate(materials):
+        color = renderer.colors[material.id]
+        buttons.append(MaterialButton(10, 10 + i * 50, 100, 40, material, color))
 
-    # Update material selector
     selected_material = Sand()
     font = pygame.font.Font(None, 36)
 
@@ -36,41 +51,34 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-                # Save profiling results to a file
-                # with open("profiling_results.txt", "w") as file:
-                #     ps = pstats.Stats(pr, stream=file).sort_stats("cumulative")
-                #     ps.print_stats()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                x, y = pygame.mouse.get_pos()
+                for button in buttons:
+                    if button.rect.collidepoint(x, y):
+                        selected_material = button.material()
+                        break
             elif pygame.mouse.get_pressed()[0]:
                 x, y = pygame.mouse.get_pos()
                 grid_x = x * simulation.width // window.get_width()
                 grid_y = y * simulation.height // window.get_height()
                 simulation.add_material(grid_x, grid_y, selected_material, 1)
-            elif event.type == pygame.KEYDOWN:
-                # Update material selection
-                if event.key == pygame.K_s:
-                    selected_material = Sand()
-                elif event.key == pygame.K_w:
-                    selected_material = Water()
-                elif event.key == pygame.K_l:
-                    selected_material = Lava()
-                elif event.key == pygame.K_t:
-                    selected_material = Steam()
-                elif event.key == pygame.K_r:
-                    selected_material = Stone()
-
-        # Start profiling
-        # pr.enable()
 
         asyncio.run(simulation.update())
         asyncio.run(renderer.render())
 
-        # Render material selector
+        # Draw material buttons
+        for button in buttons:
+            button.draw(window)
+
+        # Highlight selected material
+        for button in buttons:
+            if isinstance(selected_material, button.material):
+                pygame.draw.rect(window, (255, 255, 0), button.rect, 3)
+
+        # Render material selector text
         selector_text = f"Selected: {selected_material.__class__.__name__}"
         text_surface = font.render(selector_text, True, (255, 255, 255))
-        window.blit(text_surface, (10, 10))
-
-        # Stop profiling
-        # pr.disable()
+        window.blit(text_surface, (120, 10))
 
         pygame.display.flip()
         clock.tick(60)

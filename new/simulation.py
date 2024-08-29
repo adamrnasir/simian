@@ -1,19 +1,13 @@
 import numpy as np
-from numba import jit, prange
-
-# Material constants
-AIR = 0
-SAND = 1
+from materials import MATERIALS, Air
+import asyncio
 
 
 class Simulation:
-    AIR = AIR
-    SAND = SAND
-
     def __init__(self, width, height):
         self.width = width
         self.height = height
-        self.grid = np.zeros((height, width), dtype=np.int8)
+        self.grid = np.full((height, width), Air.id, dtype=np.int8)
 
     def add_material(self, x, y, material, radius):
         for dx in range(-radius, radius + 1):
@@ -21,31 +15,25 @@ class Simulation:
                 if dx * dx + dy * dy <= radius * radius:
                     nx, ny = x + dx, y + dy
                     if 0 <= nx < self.width and 0 <= ny < self.height:
-                        self.grid[ny, nx] = material
+                        self.grid[ny, nx] = material.id
 
-    def update(self):
-        self.grid = update_grid(self.grid, self.width, self.height)
+    async def update(self):
+        self.grid = await update_grid(self.grid, self.width, self.height)
 
 
-@jit(nopython=True, parallel=True)
-def update_grid(grid, width, height):
+async def async_range(count):
+    for i in range(count):
+        yield i
+
+
+async def update_grid(grid, width, height):
     new_grid = grid.copy()
-    for y in prange(height):
+    tasks = []
+    async for y in async_range(height):
         actual_y = height - 1 - y  # Process from bottom to top
-        for x in prange(width):
-            material = grid[actual_y, x]
-            if material == AIR:
-                continue
-
-            if material == SAND:
-                if actual_y < height - 1:
-                    if new_grid[actual_y + 1, x] == AIR:
-                        new_grid[actual_y + 1, x] = SAND
-                        new_grid[actual_y, x] = AIR
-                    elif x > 0 and new_grid[actual_y + 1, x - 1] == AIR:
-                        new_grid[actual_y + 1, x - 1] = SAND
-                        new_grid[actual_y, x] = AIR
-                    elif x < width - 1 and new_grid[actual_y + 1, x + 1] == AIR:
-                        new_grid[actual_y + 1, x + 1] = SAND
-                        new_grid[actual_y, x] = AIR
+        async for x in async_range(width):
+            material_id = grid[actual_y, x]
+            if material_id != Air.id:
+                tasks.append(MATERIALS[material_id].update(grid, x, actual_y, new_grid))
+    await asyncio.gather(*tasks)
     return new_grid

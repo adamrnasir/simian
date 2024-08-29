@@ -39,12 +39,7 @@ def main():
                 # with open("profiling_results.txt", "w") as file:
                 #     ps = pstats.Stats(pr, stream=file).sort_stats("cumulative")
                 #     ps.print_stats()
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                x, y = pygame.mouse.get_pos()
-                grid_x = x * simulation.width // window.get_width()
-                grid_y = y * simulation.height // window.get_height()
-                simulation.add_material(grid_x, grid_y, selected_material, 5)
-            elif event.type == pygame.MOUSEMOTION and pygame.mouse.get_pressed()[0]:
+            elif pygame.mouse.get_pressed()[0]:
                 x, y = pygame.mouse.get_pos()
                 grid_x = x * simulation.width // window.get_width()
                 grid_y = y * simulation.height // window.get_height()

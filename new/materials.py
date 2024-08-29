@@ -52,8 +52,9 @@ class Particle(Material):
 
     def calculate_movement(self, grid, x, y):
         surrounding_density = self.get_surrounding_density(grid, x, y)
+        min_fall_speed = int((self.density / surrounding_density) * GRAVITY)
         max_fall_speed = int((self.density / surrounding_density) * GRAVITY) + 1
-        fall_speed = random.randint(1, max_fall_speed)
+        fall_speed = random.randint(min_fall_speed, max(min_fall_speed, max_fall_speed))
 
         dx = random.randint(-1, 1)
         return fall_speed, dx
@@ -139,7 +140,7 @@ class Fluid(Particle):
 
 class Sand(Powder):
     id = 1
-    density = 2.0
+    density = 1.5
     friction = 0.7
     elasticity = 0.3
     mass = 1.5
@@ -209,7 +210,7 @@ class Lava(Fluid):
 
 class Stone(Powder):
     id = 5
-    density = 2.6
+    density = 100
     friction = 0.9
     elasticity = 0.1
     mass = 2.5

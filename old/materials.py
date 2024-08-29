@@ -99,8 +99,6 @@ class Ball(Material):
 
     @classmethod
     def update_particle(cls, particle, dt, gravity):
-        # Balls are fully affected by gravity
-        particle.body.velocity += Vec2d(*gravity) * dt
         return True
 
     @classmethod

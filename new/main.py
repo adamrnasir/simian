@@ -17,7 +17,7 @@ def main():
     width, height = GRID_SIZE, GRID_SIZE
     window = pygame.display.set_mode((800, 800))  # Larger window size
 
-    pygame.display.set_caption("Quantized Particle Physics Simulation")
+    pygame.display.set_caption("Powder Sim")
 
     simulation = Simulation(width, height)
     renderer = Renderer(window, simulation)

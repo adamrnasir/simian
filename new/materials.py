@@ -1,22 +1,20 @@
 from abc import ABC, abstractmethod
 import random
 
-# Add a global gravity constant
 GRAVITY = 1.0
 
 
 class Material(ABC):
     id = None
-    density = None
+    density = 0.1
 
     @abstractmethod
     async def update(self, grid, x, y, new_grid):
         pass
 
-    @staticmethod
-    def react(material1, material2):
+    def react(self, other_material):
         # Default behavior: no reaction
-        return None
+        return self
 
 
 class Air(Material):
@@ -42,24 +40,21 @@ class Particle(Material):
             if new_grid[target_y, target_x] == Air.id:
                 self.move(new_grid, x, y, target_x, target_y)
             else:
-                reaction_result = self.react(
-                    self, MATERIALS[new_grid[target_y, target_x]]
-                )
-                if reaction_result:
+                other_material = MATERIALS[new_grid[target_y, target_x]]
+                reaction_result = self.react(other_material)
+                if reaction_result != self:
                     new_grid[target_y, target_x] = reaction_result.id
                     new_grid[y, x] = Air.id
-                elif MATERIALS[new_grid[target_y, target_x]].density < self.density:
+                elif other_material.density < self.density:
                     self.displace(new_grid, x, y, target_x, target_y)
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
 
     def calculate_movement(self, grid, x, y):
         surrounding_density = self.get_surrounding_density(grid, x, y)
-        # Incorporate global gravity into fall speed calculation
         max_fall_speed = int((self.density / surrounding_density) * GRAVITY) + 1
         fall_speed = random.randint(1, max_fall_speed)
 
-        # Add horizontal movement
         dx = random.randint(-1, 1)
         return fall_speed, dx
 
@@ -122,7 +117,6 @@ class Fluid(Particle):
     def spread_horizontally(self, grid, new_grid, x, y):
         height, width = grid.shape
         surrounding_density = self.get_surrounding_density(grid, x, y)
-        # Incorporate global gravity into spread distance calculation
         spread_distance = random.randint(
             1,
             int((self.density / surrounding_density) * (1 - self.viscosity) * GRAVITY)
@@ -150,12 +144,22 @@ class Sand(Powder):
     elasticity = 0.3
     mass = 1.5
 
+    def react(self, other_material):
+        if isinstance(other_material, Lava):
+            return Stone()
+        return self
+
 
 class Water(Fluid):
     id = 2
     density = 1.0
     viscosity = 0.3
     mass = 1.0
+
+    def react(self, other_material):
+        if isinstance(other_material, Lava):
+            return Steam()
+        return self
 
 
 class Steam(Fluid):
@@ -175,22 +179,20 @@ class Steam(Fluid):
             if new_grid[target_y, target_x] == Air.id:
                 self.move(new_grid, x, y, target_x, target_y)
             else:
-                reaction_result = self.react(
-                    self, MATERIALS[new_grid[target_y, target_x]]
-                )
-                if reaction_result:
+                other_material = MATERIALS[new_grid[target_y, target_x]]
+                reaction_result = self.react(other_material)
+                if reaction_result != self:
                     new_grid[target_y, target_x] = reaction_result.id
                     new_grid[y, x] = Air.id
-                elif MATERIALS[new_grid[target_y, target_x]].density > self.density:
+                elif other_material.density > self.density:
                     self.displace(new_grid, x, y, target_x, target_y)
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
 
-    @staticmethod
-    def react(material1, material2):
-        if isinstance(material2, Water):
-            return None  # Steam condenses back to water
-        return None
+    def react(self, other_material):
+        if isinstance(other_material, Water):
+            return Water()  # Steam condenses back to water
+        return self
 
 
 class Lava(Fluid):
@@ -199,13 +201,10 @@ class Lava(Fluid):
     viscosity = 0.8
     mass = 2.0
 
-    @staticmethod
-    def react(material1, material2):
-        if isinstance(material2, Water):
-            return Steam()  # Lava turns water into steam
-        if isinstance(material2, Sand):
-            return Stone()  # Lava turns sand into stone
-        return None
+    def react(self, other_material):
+        if isinstance(other_material, Water):
+            return Stone()  # Lava cools and turns into stone when it touches water
+        return self
 
 
 class Stone(Powder):
@@ -215,22 +214,6 @@ class Stone(Powder):
     elasticity = 0.1
     mass = 2.5
 
-
-# Update reaction methods for existing materials
-def sand_react(material1, material2):
-    if isinstance(material2, Lava):
-        return Stone()  # Sand turns into stone when it touches lava
-    return None
-
-
-def water_react(material1, material2):
-    if isinstance(material2, Lava):
-        return Steam()  # Water turns into steam when it touches lava
-    return None
-
-
-Sand.react = staticmethod(sand_react)
-Water.react = staticmethod(water_react)
 
 # Dictionary to map material IDs to their respective classes
 MATERIALS = {

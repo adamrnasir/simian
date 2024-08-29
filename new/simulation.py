@@ -1,6 +1,5 @@
 import numpy as np
-from materials import MATERIALS, Air
-import asyncio
+from materials import get_material, Air
 
 
 class Simulation:
@@ -21,19 +20,20 @@ class Simulation:
         self.grid = await update_grid(self.grid, self.width, self.height)
 
 
-async def async_range(count):
-    for i in range(count):
+async def async_range(start=0, end=None, step=1):
+    if end is None:
+        end = start
+        start = 0
+    for i in range(start, end, step):
         yield i
 
 
 async def update_grid(grid, width, height):
     new_grid = grid.copy()
-    tasks = []
-    async for y in async_range(height):
-        actual_y = height - 1 - y  # Process from bottom to top
+    async for y in async_range(height - 1, -1, -1):
         async for x in async_range(width):
-            material_id = grid[actual_y, x]
+            material_id = grid[y, x]
             if material_id != Air.id:
-                tasks.append(MATERIALS[material_id].update(grid, x, actual_y, new_grid))
-    await asyncio.gather(*tasks)
+                material = get_material(material_id)
+                material.update(grid, x, y, new_grid)
     return new_grid

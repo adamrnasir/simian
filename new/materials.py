@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import random
+from copy import deepcopy
 
 GRAVITY = 1.0
 
@@ -7,21 +8,32 @@ GRAVITY = 1.0
 class Material(ABC):
     id = None
     density = 0.1
+    lifespan = None  # Default lifespan is None (infinite)
+
+    def __init__(self):
+        self.age = 0
 
     @abstractmethod
-    async def update(self, grid, x, y, new_grid):
+    def update(self, grid, x, y, new_grid):
         pass
 
     def react(self, other_material):
         # Default behavior: no reaction
         return self
 
+    def end_of_life(self, grid, x, y):
+        # Default behavior: turn into Air
+        grid[y, x] = Air.id
+
+    def copy(self):
+        return deepcopy(self)
+
 
 class Air(Material):
     id = 0
     density = 0.1
 
-    async def update(self, grid, x, y, new_grid):
+    def update(self, grid, x, y, new_grid):
         pass
 
 
@@ -30,7 +42,12 @@ class Particle(Material):
     elasticity = 0.5
     mass = 1.0
 
-    async def update(self, grid, x, y, new_grid):
+    def update(self, grid, x, y, new_grid):
+        self.age += 1
+        if self.lifespan is not None and self.age > self.lifespan:
+            self.end_of_life(new_grid, x, y)
+            return
+
         height, width = grid.shape
         if y < height - 1:
             fall_speed, dx = self.calculate_movement(grid, x, y)
@@ -40,9 +57,9 @@ class Particle(Material):
             if new_grid[target_y, target_x] == Air.id:
                 self.move(new_grid, x, y, target_x, target_y)
             else:
-                other_material = MATERIALS[new_grid[target_y, target_x]]
+                other_material = get_material(new_grid[target_y, target_x])
                 reaction_result = self.react(other_material)
-                if reaction_result != self:
+                if reaction_result.id != self.id:
                     new_grid[target_y, target_x] = reaction_result.id
                     new_grid[y, x] = Air.id
                 elif other_material.density < self.density:
@@ -77,7 +94,9 @@ class Particle(Material):
             if 0 <= ny < height and 0 <= nx < width
         ]
 
-        total_density = sum(MATERIALS[grid[ny, nx]].density for ny, nx in valid_cells)
+        total_density = sum(
+            get_material(grid[ny, nx]).density for ny, nx in valid_cells
+        )
         return total_density / len(valid_cells) if valid_cells else self.density
 
     def move(self, new_grid, from_x, from_y, to_x, to_y):
@@ -98,7 +117,7 @@ class Particle(Material):
                 if target == Air.id:
                     self.move(new_grid, x, y, nx, ny)
                     break
-                elif MATERIALS[target].density < self.density:
+                elif get_material(target).density < self.density:
                     self.displace(new_grid, x, y, nx, ny)
                     break
 
@@ -110,8 +129,8 @@ class Powder(Particle):
 class Fluid(Particle):
     viscosity = 0.5
 
-    async def update(self, grid, x, y, new_grid):
-        await super().update(grid, x, y, new_grid)
+    def update(self, grid, x, y, new_grid):
+        super().update(grid, x, y, new_grid)
         if new_grid[y, x] == self.id:  # If the particle hasn't moved vertically
             self.spread_horizontally(grid, new_grid, x, y)
 
@@ -133,7 +152,7 @@ class Fluid(Particle):
                 if new_grid[y, target_x] == Air.id:
                     self.move(new_grid, x, y, target_x, y)
                     break
-                elif MATERIALS[new_grid[y, target_x]].density < self.density:
+                elif get_material(new_grid[y, target_x]).density < self.density:
                     self.displace(new_grid, x, y, target_x, y)
                     break
 
@@ -168,8 +187,14 @@ class Steam(Fluid):
     density = 0.5
     viscosity = 0.1
     mass = 0.5
+    lifespan = 60  # Steam lasts for 100 update cycles
 
-    async def update(self, grid, x, y, new_grid):
+    def update(self, grid, x, y, new_grid):
+        self.age += 1
+        if self.lifespan is not None and self.age > self.lifespan:
+            self.end_of_life(new_grid, x, y)
+            return
+
         # Steam rises
         height, width = grid.shape
         if y > 0:
@@ -180,20 +205,29 @@ class Steam(Fluid):
             if new_grid[target_y, target_x] == Air.id:
                 self.move(new_grid, x, y, target_x, target_y)
             else:
-                other_material = MATERIALS[new_grid[target_y, target_x]]
+                other_material = get_material(new_grid[target_y, target_x])
                 reaction_result = self.react(other_material)
-                if reaction_result != self:
+                if reaction_result.id != self.id:
                     new_grid[target_y, target_x] = reaction_result.id
                     new_grid[y, x] = Air.id
                 elif other_material.density > self.density:
                     self.displace(new_grid, x, y, target_x, target_y)
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
+        else:
+            self.try_move_diagonally(new_grid, x, y, width, height)
 
     def react(self, other_material):
         if isinstance(other_material, Water):
             return Water()  # Steam condenses back to water
         return self
+
+    def end_of_life(self, grid, x, y):
+        # 20% chance to turn into Water, 80% chance to disappear
+        if random.random() < 0.2:
+            grid[y, x] = Water.id
+        else:
+            grid[y, x] = Air.id
 
 
 class Lava(Fluid):
@@ -218,10 +252,15 @@ class Stone(Powder):
 
 # Dictionary to map material IDs to their respective classes
 MATERIALS = {
-    Air.id: Air(),
-    Sand.id: Sand(),
-    Water.id: Water(),
-    Steam.id: Steam(),
-    Lava.id: Lava(),
-    Stone.id: Stone(),
+    Air.id: Air,
+    Sand.id: Sand,
+    Water.id: Water,
+    Steam.id: Steam,
+    Lava.id: Lava,
+    Stone.id: Stone,
 }
+
+
+# Function to get a new instance of a material
+def get_material(id):
+    return MATERIALS[id]()

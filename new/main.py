@@ -2,8 +2,9 @@ import pygame
 from simulation import Simulation
 from render import Renderer
 from materials import Sand, Water, Lava, Steam, Stone
-import cProfile
-import pstats
+# import cProfile
+
+# import pstats
 import asyncio
 
 # Add this constant at the top of the file
@@ -25,7 +26,7 @@ def main():
     running = True
 
     # Create a Profile object
-    pr = cProfile.Profile()
+    # pr = cProfile.Profile()
 
     # Update material selector
     selected_material = Sand()
@@ -43,7 +44,7 @@ def main():
                 x, y = pygame.mouse.get_pos()
                 grid_x = x * simulation.width // window.get_width()
                 grid_y = y * simulation.height // window.get_height()
-                simulation.add_material(grid_x, grid_y, selected_material, 5)
+                simulation.add_material(grid_x, grid_y, selected_material, 1)
             elif event.type == pygame.KEYDOWN:
                 # Update material selection
                 if event.key == pygame.K_s:

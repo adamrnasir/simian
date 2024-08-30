@@ -1,8 +1,9 @@
 import pygame
 from simulation import Simulation
 from render import Renderer
-from materials import Sand, Water, Lava, Steam, Stone
+from materials import Sand, Water, Lava, Steam, Stone, Mud
 import asyncio
+import cProfile
 
 # Add this constant at the top of the file
 GRID_SIZE = 100  # Increase this value for a larger grid
@@ -37,8 +38,10 @@ def main():
     clock = pygame.time.Clock()
     running = True
 
+    brush_size = 1
+
     # Create material buttons using colors from the renderer
-    materials = [Sand, Water, Lava, Steam, Stone]
+    materials = [Sand, Water, Lava, Steam, Stone, Mud]
     buttons = []
     for i, material in enumerate(materials):
         color = renderer.colors[material.id]
@@ -47,21 +50,36 @@ def main():
     selected_material = Sand()
     font = pygame.font.Font(None, 36)
 
+    # Set up profiler
+    profiler = cProfile.Profile()
+    profiler.enable()
+
     while running:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+                profiler.disable()
+                profiler.print_stats(sort="time")
+                profiler.dump_stats("profile.pstats")
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x, y = pygame.mouse.get_pos()
                 for button in buttons:
                     if button.rect.collidepoint(x, y):
                         selected_material = button.material()
                         break
+            # If the left bracket is pressed, decrease brush size
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_DOWN:
+                    print(brush_size)
+                    brush_size = max(1, brush_size - 1)
+                elif event.key == pygame.K_UP:
+                    print(brush_size)
+                    brush_size = min(10, brush_size + 1)
             elif pygame.mouse.get_pressed()[0]:
                 x, y = pygame.mouse.get_pos()
-                grid_x = x * simulation.width // window.get_width()
-                grid_y = y * simulation.height // window.get_height()
-                simulation.add_material(grid_x, grid_y, selected_material, 1)
+                grid_x = int(x * simulation.width // window.get_width())
+                grid_y = int(y * simulation.height // window.get_height())
+                simulation.add_material(grid_x, grid_y, selected_material, brush_size)
 
         asyncio.run(simulation.update())
         asyncio.run(renderer.render())

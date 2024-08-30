@@ -1,6 +1,7 @@
 import pygame
 import asyncio
-from materials import Air, Sand, Water, Steam, Lava, Stone
+import numpy as np
+from materials import Air, Sand, Water, Steam, Lava, Stone, Mud
 
 
 class Renderer:
@@ -19,6 +20,7 @@ class Renderer:
             Steam.id: (220, 220, 220),
             Lava.id: (207, 16, 32),
             Stone.id: (120, 120, 120),
+            Mud.id: (60, 60, 50),
         }
 
     async def render(self):
@@ -45,23 +47,22 @@ class Renderer:
             tasks.append(self._render_row(y, surface))
         await asyncio.gather(*tasks)
 
-    @staticmethod
-    async def async_range(count):
-        for i in range(count):
-            yield (i)
-
     async def _render_row(self, y, surface):
-        async for x in self.async_range(self.simulation.width):
-            material_id = self.simulation.grid[y, x]
-            if material_id != Air.id:  # Only draw non-Air particles
-                color = self.colors[material_id]
-                pygame.draw.rect(
-                    surface,
-                    color,
-                    (
-                        x * self.pixel_size,
-                        y * self.pixel_size,
-                        self.pixel_size,
-                        self.pixel_size,
-                    ),
-                )
+        row = self.simulation.grid[y]
+        non_air_indices = np.where(row != Air.id)[0]
+
+        async def draw_particle(x):
+            material_id = row[x]
+            color = self.colors[material_id]
+            pygame.draw.rect(
+                surface,
+                color,
+                (
+                    x * self.pixel_size,
+                    y * self.pixel_size,
+                    self.pixel_size,
+                    self.pixel_size,
+                ),
+            )
+
+        await asyncio.gather(*[draw_particle(x) for x in non_air_indices])

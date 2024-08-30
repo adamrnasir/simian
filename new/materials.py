@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-import random
+import numpy as np
 from copy import deepcopy
 import math
+import asyncio
 
 GRAVITY = 1.0
 
@@ -11,7 +12,7 @@ class Material(ABC):
     density = 0.1
 
     @abstractmethod
-    def update(self, grid, x, y, new_grid):
+    async def update(self, grid, x, y, new_grid):
         pass
 
     def react(self, other_material):
@@ -39,10 +40,10 @@ class Particle(Material):
     elasticity = 0.5
     mass = 1.0
 
-    def update(self, grid, x, y, new_grid):
+    async def update(self, grid, x, y, new_grid):
         height, width = grid.shape
         if y < height - 1:
-            fall_speed, dx = self.calculate_movement(grid, x, y)
+            fall_speed, dx = await self.calculate_fall(grid, x, y)
             target_y = min(y + fall_speed, height - 1)
             target_x = max(0, min(x + dx, width - 1))
 
@@ -65,9 +66,9 @@ class Particle(Material):
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
 
-    def calculate_movement(self, grid, x, y):
-        dx = random.randint(-1, 1)
-        surrounding_density = self.get_surrounding_density(grid, x, y)
+    async def calculate_fall(self, grid, x, y):
+        dx = np.random.randint(-1, 2)
+        surrounding_density = await self.get_density_below(grid, x, y)
 
         if self.density <= surrounding_density:
             return 1, 0  # Particle floats or sits on top
@@ -79,28 +80,55 @@ class Particle(Material):
 
         return fall_speed, dx
 
-    def get_surrounding_density(self, grid, x, y):
+    async def get_density_below(self, grid, x, y):
         height, width = grid.shape
-        surrounding_cells = [
+
+        valid_cells = [
             (y + 1, x),
-            (y - 1, x),
-            (y, x + 1),
-            (y, x - 1),
             (y + 1, x + 1),
             (y + 1, x - 1),
-            (y - 1, x + 1),
-            (y - 1, x - 1),
-        ]
-        valid_cells = [
-            (ny, nx)
-            for ny, nx in surrounding_cells
-            if 0 <= ny < height and 0 <= nx < width
         ]
 
-        total_density = sum(
-            get_material(grid[ny, nx]).density for ny, nx in valid_cells
+        async def get_particle_density(ny, nx):
+            particle = await self._get_valid_particle(grid, ny, nx)
+            return particle.density if particle else None
+
+        densities = await asyncio.gather(
+            *[get_particle_density(ny, nx) for ny, nx in valid_cells]
         )
-        return total_density / len(valid_cells) if valid_cells else self.density
+        valid_densities = [d for d in densities if d is not None]
+
+        if not valid_densities:
+            return 1000  # Floor
+
+        return sum(valid_densities) / len(valid_densities)
+
+    async def _get_valid_particle(self, grid, ny, nx):
+        if ny >= 0 and ny < grid.shape[0] and nx >= 0 and nx < grid.shape[1]:
+            return get_material(grid[ny, nx])
+        return None
+
+    def get_surrounding_materials(self, grid, x, y):
+        height, width = grid.shape
+        surrounding_cells = np.array(
+            [
+                [y + 1, x],
+                [y - 1, x],
+                [y, x + 1],
+                [y, x - 1],
+                [y + 1, x + 1],
+                [y + 1, x - 1],
+                [y - 1, x + 1],
+                [y - 1, x - 1],
+            ]
+        )
+        valid_cells = surrounding_cells[
+            (surrounding_cells[:, 0] >= 0)
+            & (surrounding_cells[:, 0] < height)
+            & (surrounding_cells[:, 1] >= 0)
+            & (surrounding_cells[:, 1] < width)
+        ]
+        return [get_material(grid[ny, nx]) for ny, nx in valid_cells]
 
     def move(self, new_grid, from_x, from_y, to_x, to_y):
         new_grid[to_y, to_x] = self.id
@@ -112,8 +140,8 @@ class Particle(Material):
         new_grid[from_y, from_x] = displaced_material
 
     def try_move_diagonally(self, new_grid, x, y, width, height):
-        directions = [(y + 1, x - 1), (y + 1, x + 1)]
-        random.shuffle(directions)
+        directions = np.array([(y + 1, x - 1), (y + 1, x + 1)])
+        np.random.shuffle(directions)
         for ny, nx in directions:
             if 0 <= nx < width and 0 <= ny < height:
                 target = new_grid[ny, nx]
@@ -134,31 +162,39 @@ class Powder(Particle):
 class Fluid(Particle):
     viscosity = 0.5
 
-    def update(self, grid, x, y, new_grid):
-        super().update(grid, x, y, new_grid)
+    async def update(self, grid, x, y, new_grid):
+        await super().update(grid, x, y, new_grid)
         if new_grid[y, x] == self.id:  # If the particle hasn't moved vertically
-            self.spread_horizontally(grid, new_grid, x, y)
+            await self.spread_horizontally(grid, new_grid, x, y)
 
-    def spread_horizontally(self, grid, new_grid, x, y):
-        height, width = grid.shape
-        surrounding_density = self.get_surrounding_density(grid, x, y)
-        spread_distance = random.randint(
-            1,
-            int((self.density / surrounding_density) * (1 - self.viscosity) * GRAVITY)
-            + 1,
-        )
+    async def spread_horizontally(self, grid, new_grid, x, y):
+        if np.random.random() > self.viscosity:
+            height, width = grid.shape
+            surrounding_density = await self.get_density_below(grid, x, y)
+            spread_distance = np.random.randint(
+                1,
+                max(
+                    1,
+                    int(
+                        (self.density / surrounding_density)
+                        * (1 - self.viscosity)
+                        * GRAVITY
+                    ),
+                )
+                + 1,
+            )
 
-        directions = [-1, 1]
-        random.shuffle(directions)
+            directions = np.array([-1, 1])
+            np.random.shuffle(directions)
 
-        for direction in directions:
-            target_x = x + direction * spread_distance
-            if 0 <= target_x < width:
-                if new_grid[y, target_x] == Air.id:
-                    self.move(new_grid, x, y, target_x, y)
-                    break
-                elif get_material(new_grid[y, target_x]).density < self.density:
-                    self.displace(new_grid, x, y, target_x, y)
+            for direction in directions:
+                target_x = x + direction * spread_distance
+                if 0 <= target_x < width:
+                    if new_grid[y, target_x] == Air.id:
+                        self.move(new_grid, x, y, target_x, y)
+                        break
+                    elif get_material(new_grid[y, target_x]).density < self.density:
+                        self.displace(new_grid, x, y, target_x, y)
                     break
 
 
@@ -172,6 +208,8 @@ class Sand(Powder):
     def react(self, other_material):
         if isinstance(other_material, Lava):
             return Stone()
+        elif isinstance(other_material, Water):
+            return Mud()
         return self
 
 
@@ -193,11 +231,11 @@ class Steam(Fluid):
     viscosity = 0.1
     mass = 0.5
 
-    def update(self, grid, x, y, new_grid):
+    async def update(self, grid, x, y, new_grid):
         # Steam rises
         height, width = grid.shape
         if y > 0:
-            fall_speed, dx = self.calculate_movement(grid, x, y)
+            fall_speed, dx = await self.calculate_fall(grid, x, y)
             target_y = max(y - fall_speed, 0)
             target_x = max(0, min(x + dx, width - 1))
 
@@ -218,7 +256,7 @@ class Steam(Fluid):
                 else:
                     self.try_move_diagonally(new_grid, x, y, width, height)
         else:
-            if random.random() < 0.5:
+            if np.random.random() < 0.5:
                 self.try_move_diagonally(new_grid, x, y, width, height)
             else:
                 self.end_of_life(new_grid, x, y)
@@ -230,7 +268,7 @@ class Steam(Fluid):
 
     def end_of_life(self, grid, x, y):
         # 20% chance to turn into Water, 80% chance to disappear
-        if random.random() < 0.2:
+        if np.random.random() < 0.2:
             grid[y, x] = Water.id
         else:
             grid[y, x] = Air.id
@@ -239,7 +277,7 @@ class Steam(Fluid):
 class Lava(Fluid):
     id = 4
     density = 2.5
-    viscosity = 0.8
+    viscosity = 0.5
     mass = 2.0
 
     def react(self, other_material):
@@ -263,6 +301,13 @@ class Stone(Powder):
         return self
 
 
+class Mud(Fluid):
+    id = 6
+    density = 2.0
+    viscosity = 0.9
+    mass = 1.0
+
+
 # Dictionary to map material IDs to their respective classes
 MATERIALS = {
     Air.id: Air,
@@ -271,6 +316,7 @@ MATERIALS = {
     Steam.id: Steam,
     Lava.id: Lava,
     Stone.id: Stone,
+    Mud.id: Mud,
 }
 
 

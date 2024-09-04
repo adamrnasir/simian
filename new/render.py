@@ -52,7 +52,7 @@ class Renderer:
         non_air_indices = np.where(row != Air.id)[0]
 
         async def draw_particle(x):
-            material_id = row[x]
+            material_id = row[x].id
             color = self.colors[material_id]
             pygame.draw.rect(
                 surface,

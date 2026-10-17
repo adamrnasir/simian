@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:">
+    <meta name="theme-color" content="#f5f4f0">
+    <meta name="color-scheme" content="light dark">
+    <title>Simian</title>
+    <style>html{background:#f5f4f0}html[data-theme="dark"]{background:#080909}@media(prefers-color-scheme:dark){html:not([data-theme]){background:#080909}}</style>
+    <script src="theme.js"></script>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="shell.css">
+    <link rel="stylesheet" href="simian.css">
+    <script type="module" src="app.mjs"></script>
+  </head>
+  <body class="simian-page simian-app">
+    <div class="page">
+      <main class="laboratory">
+        <header class="lab-heading">
+          <h1>Simian</h1>
+          <button class="theme-toggle" type="button" aria-label="Dark mode" aria-pressed="false" title="Dark mode" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16Z" fill="currentColor" stroke="none"/></svg></button>
+        </header>
+        <div class="apparatus">
+          <div class="world-frame">
+            <canvas id="world" width="672" height="672" tabindex="0" aria-label="Particle field. Arrow keys move the brush; Enter places particles. Hold Enter to paint. Shift erases." aria-describedby="field-help">Simian requires a browser with Canvas support.</canvas>
+            <span class="bound bound-nw" data-corner="nw" aria-hidden="true">+</span><span class="bound bound-ne" data-corner="ne" aria-hidden="true">+</span>
+            <span class="bound bound-sw" data-corner="sw" aria-hidden="true">+</span><span class="bound bound-se" data-corner="se" aria-hidden="true">+</span>
+            <span class="field-coordinate" aria-hidden="true"></span>
+          </div>
+        <section class="instrument-panel" aria-label="Simulation controls">
+          <h2 class="panel-label">Controls</h2>
+          <div class="settings-group">
+            <div class="controls">
+              <button id="play" class="playback" type="button" aria-label="Pause" title="Pause"><svg class="icon-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 3h3v10H4zM9 3h3v10H9z"/></svg><svg class="icon-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5v11l9-5.5z"/></svg></button>
+              <button id="step" type="button">Step</button>
+            </div>
+            <label class="slider-control" for="speed">Tick speed <input id="speed" type="range" min="0" max="8" step="1" value="2" aria-valuetext="1×"><output id="speed-value" for="speed">1×</output></label>
+          </div>
+          <div class="control-section">
+            <h3 class="section-label">Brush</h3>
+            <label class="slider-control" for="brush">Diameter <input id="brush" type="range" min="1" max="15" value="5"><output id="brush-value" for="brush">5</output></label>
+          </div>
+          <div class="control-section">
+            <h3 class="section-label">Canvas</h3>
+            <label class="phase-control"><input id="show-symbols" type="checkbox" checked> Show symbols</label>
+            <label class="phase-control"><input id="blobs" type="checkbox"> <span>Blob mode <span class="control-caveat">(High performance impact!)</span></span></label>
+            <label class="phase-control"><input id="show-background" type="checkbox"> Show background</label>
+            <label class="slider-control" for="density">Grid density <input id="density" type="range" min="0.5" max="2" step="0.25" value="1" aria-describedby="density-pending"><output id="density-value" for="density">1×</output></label>
+            <p id="density-pending" class="control-note" hidden>Applies on Load or Clear</p>
+            <label class="phase-control"><input id="zero-g" type="checkbox"> Zero-g</label>
+          </div>
+          <div class="control-section">
+            <h3 class="section-label">Fields</h3>
+            <div class="field-controls" role="group" aria-label="Gravity overlays"><span>Gravity</span><label class="phase-control"><input id="grav-view" type="checkbox" aria-label="Gravity field"> Field</label><label class="phase-control"><input id="grav-arrows" type="checkbox" aria-label="Gravity arrows"> Arrows</label></div>
+            <div class="field-controls" role="group" aria-label="Wind overlays"><span>Wind</span><label class="phase-control"><input id="wind-view" type="checkbox" aria-label="Wind field"> Field</label><label class="phase-control"><input id="wind-arrows" type="checkbox" aria-label="Wind arrows"> Arrows</label></div>
+            <div class="field-controls" role="group" aria-label="Temperature overlay"><span>Temperature</span><label class="phase-control"><input id="temperature-view" type="checkbox" aria-label="Temperature field" aria-describedby="temperature-key"> Field</label></div>
+            <p id="temperature-key" class="control-note" hidden>Blue · cold / clear · 20° / red · hot<br>Particle temperature; air in empty cells.</p>
+          </div>
+          <div class="scene-controls control-section"><label class="section-label" for="scene">Scene</label><select id="scene"><option value="estuary">Estuary</option><option value="water-cycle">Water cycle</option><option value="convection">Vapor convection</option><option value="test-tubes">Test tubes</option><option value="empty">Empty chamber</option></select><div class="scene-actions"><button id="load-scene" type="button">Load ↗&#xFE0E;</button><button id="clear" type="button">Clear</button></div></div>
+          <p id="field-help" class="visually-hidden">Drag to paint. Arrow keys move and aim the brush, Enter paints, Shift + Enter erases, Space pauses, brackets change brush diameter in cells, and 1–9 select elements. Wind follows the last movement direction; hold to blow.</p>
+          <div class="panel-footer">
+            <p class="telemetry"><span id="population">0 particles</span><span id="state" role="status">Preparing field…</span></p>
+            <p class="debug-readout" aria-label="Performance"><span id="fps">— fps</span><span id="step-time">— ms / tick</span><span id="draw-time">— ms / draw</span><span id="tick-rate">— ticks / s</span></p>
+            <div class="particle-inspector" aria-label="Particle inspector"><strong id="inspected-name">—</strong><p id="inspected-properties"></p></div>
+          </div>
+          <noscript><p>Enable JavaScript to run this local, browser-based experiment.</p></noscript>
+        </section>
+        <section class="element-panel" aria-label="Materials">
+          <h2 class="panel-label">Elements</h2>
+          <div class="element-grid" role="group" aria-label="Particle elements"><button id="erase" type="button" class="element-choice" aria-pressed="false" aria-label="Erase"><span class="element-symbol" aria-hidden="true">⌁</span><span class="element-name">Erase</span></button></div>
+          <div class="element-settings">
+            <div id="phase-settings" class="settings-group"><label class="phase-control"><input id="phase-lock" type="checkbox"> Phase lock</label></div>
+            <div id="boid-settings" class="settings-group" hidden>
+              <label class="phase-control"><input id="feesh" type="checkbox"> Feesh</label>
+            </div>
+            <div id="grav-settings" class="settings-group" hidden>
+              <label class="phase-control"><input id="antigrav" type="checkbox"> Antigrav</label>
+              <label class="slider-control" for="grav-strength">Strength <input id="grav-strength" type="range" min="0" max="3" step="0.1" value="1"><output id="grav-strength-value" for="grav-strength">1×</output></label>
+            </div>
+            <div id="wind-settings" class="settings-group" hidden>
+              <label class="slider-control" for="wind-strength">Wind strength <output id="wind-strength-value" for="wind-strength">10×</output><input id="wind-strength" type="range" min="10" max="100" step="1" value="10"></label>
+            </div>
+          </div>
+          <div class="element-note" aria-live="polite" aria-atomic="true"><p id="element-hint"></p><p id="element-properties"></p></div>
+        </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,144 @@
+/* The apparatus may use the full window width, but the header and heading keep
+   the site-wide content width from styles.css (1352px or 1432px, less padding). */
+.simian-page .page { --page-inner: 1200px; height: 100svh; min-height: 0; max-width: none; }
+@media (min-width: 1600px) { .simian-page .page { --page-inner: 1280px; } }
+.simian-page .header, .lab-heading { width: 100%; max-width: var(--page-inner); margin-inline: auto; }
+.simian-page .header { flex: none; }
+.laboratory { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 24px 0 34px; }
+.lab-heading { flex: none; text-align: center; position: relative; margin-bottom: 24px; }
+.lab-heading h1 { font-size: 30px; font-weight: 300; letter-spacing: -.045em; }
+.lab-back { position: absolute; left: 0; top: 0; font-size: 22px; font-weight: 200; color: var(--muted); }
+/* The square field fills the available height (less room for its caption),
+   narrowing only to keep minimum-width panels. Panels sit against the field. */
+.apparatus { --panel-min: 200px; --gap: 36px; flex: 1; min-height: 0; container-type: size; display: grid; grid-template-columns: minmax(var(--panel-min), 1fr) auto minmax(var(--panel-min), 1fr); grid-template-rows: minmax(0, 1fr); gap: var(--gap); }
+.world-frame { grid-column: 2; grid-row: 1; width: min(calc(100cqh - 24px), calc(100cqw - 2 * (var(--panel-min) + var(--gap)))); aspect-ratio: 1; align-self: start; justify-self: center; position: relative; }
+.instrument-panel, .element-panel { min-height: 0; display: flex; flex-direction: column; }
+.instrument-panel { grid-column: 1; grid-row: 1; justify-self: end; width: min(100%, 264px); container-type: inline-size; }
+.element-panel { grid-column: 3; grid-row: 1; justify-self: start; width: min(100%, 264px); container-type: inline-size; }
+#world { position: absolute; display: block; touch-action: none; cursor: crosshair; image-rendering: pixelated; }
+/* Empty cells are transparent, so a faint text-colored tint reads in both themes. */
+#world.has-background { background: color-mix(in oklch, var(--text) 5%, transparent); }
+#world:focus-visible { outline: 1px solid var(--rule); outline-offset: 6px; }
+.bound { position: absolute; font: 300 13px/1 monospace; color: var(--muted); pointer-events: none; }
+.bound-nw { top: -12px; left: -12px; }.bound-ne { top: -12px; right: -12px; }
+.bound-sw { bottom: -12px; left: -12px; }.bound-se { bottom: -12px; right: -12px; }
+.field-coordinate { position: absolute; bottom: -24px; left: 0; font: 9px monospace; color: var(--muted); pointer-events: none; }
+/* Panel rhythm: --row separates controls within a group; --group pads both
+   sides of the rule between groups. Every group uses the same structure. */
+.instrument-panel, .element-panel { --row: 8px; --group: 16px; --control: 28px; --line: color-mix(in oklch, var(--text) 30%, transparent); font-size: 13px; }
+.panel-label { font-size: 10px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 var(--group); }
+.control-section, .element-settings, .element-note, .particle-inspector { display: flex; flex-direction: column; gap: var(--row); border-top: 1px solid var(--rule); margin-top: var(--group); padding-top: var(--group); }
+.section-label { margin: 0; font-size: 11px; font-weight: 400; line-height: 1.4; letter-spacing: 0; color: var(--muted); }
+.settings-group:not([hidden]) { display: flex; flex-direction: column; gap: var(--row); }
+
+/* Text buttons */
+.controls, .scene-actions { display: flex; align-items: center; gap: 20px; }
+.instrument-panel button { min-height: var(--control); padding: 0; border: 0; background: transparent; color: var(--text); font: inherit; cursor: pointer; transition: color 120ms; }
+.instrument-panel button:hover { color: var(--accent); }
+/* Both icons share one fixed-width box, so Step never shifts on toggle. */
+.instrument-panel .playback { width: 18px; display: inline-grid; place-items: center; }
+.playback svg { width: 13px; height: 13px; fill: currentColor; stroke: none; }
+.playback[data-paused="true"] .icon-pause, .playback:not([data-paused="true"]) .icon-play { display: none; }
+
+/* Checkboxes: an outlined square that fills with an inset square when on. */
+.phase-control { display: flex; align-items: center; gap: 10px; min-height: 24px; cursor: pointer; }
+.phase-control:has(input:disabled) { opacity: .4; cursor: default; }
+.field-controls { display: grid; grid-template-columns: minmax(0, 1fr) 48px 58px; align-items: center; gap: 6px; font-size: 11px; }
+.field-controls .phase-control { gap: 5px; }
+/* A muted note that flows with its label's text and wraps beneath it. */
+.control-caveat { font-size: 11px; color: var(--muted); opacity: .75; }
+.phase-control input { appearance: none; flex: none; width: 14px; height: 14px; margin: 0; border: 1px solid var(--line); border-radius: 3px; background: transparent; cursor: inherit; transition: background-color 120ms, border-color 120ms, box-shadow 120ms; }
+.phase-control:hover input:not(:disabled) { border-color: var(--text); }
+.phase-control input:checked { border-color: var(--text); background: var(--text); box-shadow: inset 0 0 0 3px var(--background); }
+.phase-control input:focus-visible { outline: 1px solid var(--accent); outline-offset: 3px; }
+
+/* Sliders: name, track, and value on one line; a thin track fills to the thumb.
+   The value column has a fixed width, so the track never resizes as it changes. */
+.slider-control { display: grid; grid-template-columns: max-content minmax(0, 1fr) 5ch; align-items: center; column-gap: 12px; min-height: 24px; cursor: pointer; }
+.slider-control input { grid-column: 2; grid-row: 1; }
+.slider-control output { grid-column: 3; grid-row: 1; text-align: right; font: 11px/1 monospace; color: var(--muted); }
+/* Narrow panels would leave too little track, so the track moves to its own line. */
+@container (max-width: 220px) {
+  .slider-control { grid-template-columns: 1fr auto; row-gap: 4px; }
+  .slider-control input { grid-column: 1 / -1; grid-row: 2; }
+  .slider-control output { grid-column: 2; }
+}
+.slider-control input { --fill: 0; appearance: none; -webkit-appearance: none; width: 100%; height: 18px; margin: 0; background: transparent; cursor: pointer; }
+.slider-control input::-webkit-slider-runnable-track { height: 2px; border-radius: 1px; background: linear-gradient(to right, var(--text) calc(6px + (100% - 12px) * var(--fill)), var(--line) 0); }
+.slider-control input::-moz-range-track { height: 2px; border-radius: 1px; background: var(--line); }
+.slider-control input::-moz-range-progress { height: 2px; border-radius: 1px; background: var(--text); }
+.slider-control input::-webkit-slider-thumb { -webkit-appearance: none; box-sizing: border-box; width: 12px; height: 12px; margin-top: -5px; border: 1.5px solid var(--text); border-radius: 50%; background: var(--background); transition: transform 120ms, box-shadow 120ms; }
+.slider-control input::-moz-range-thumb { box-sizing: border-box; width: 12px; height: 12px; border: 1.5px solid var(--text); border-radius: 50%; background: var(--background); transition: transform 120ms, box-shadow 120ms; }
+.slider-control input:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.slider-control input:hover::-moz-range-thumb { transform: scale(1.15); }
+.slider-control input:focus-visible { outline: none; }
+.slider-control input:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 40%, transparent); }
+.slider-control input:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 40%, transparent); }
+.control-note { margin: 0; font: 10px/1.5 monospace; color: var(--muted); }
+
+/* Select: underlined, with a small chevron drawn from two gradients. */
+.instrument-panel select { appearance: none; width: 100%; min-height: var(--control); padding: 0 20px 0 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--text); font: inherit; cursor: pointer;
+  background: linear-gradient(45deg, transparent 50%, var(--muted) 50%) no-repeat calc(100% - 9px) 55% / 5px 5px, linear-gradient(135deg, var(--muted) 50%, transparent 50%) no-repeat calc(100% - 4px) 55% / 5px 5px; }
+.instrument-panel select:hover { border-bottom-color: var(--text); }
+.instrument-panel option { background: var(--background); color: var(--text); }
+
+/* Element picker */
+/* Glyphs and names scale with the column width, so the longest name
+   ("Gunpowder", about 5.3em) never meets its neighbor. */
+.element-grid { --columns: 4; --column: calc((100cqw - (var(--columns) - 1) * 4px) / var(--columns)); flex: none; display: grid; grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 4px; }
+.element-choice { position: relative; min-width: 0; min-height: 60px; padding: 6px 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--element-light, var(--muted)); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; transition: background-color 120ms; }
+:root[data-theme="dark"] .element-choice { color: var(--element-dark, var(--muted)); }
+.element-choice:hover { background: color-mix(in oklch, var(--text) 5%, transparent); }
+.element-choice[aria-pressed="true"] { background: color-mix(in oklch, var(--text) 8%, transparent); }
+.element-choice[aria-pressed="true"]::after { content: ''; position: absolute; bottom: 3px; width: 16px; border-bottom: 1px solid currentColor; }
+.element-choice:focus-visible { outline-offset: 0; }
+/* A fixed 1em box keeps SVG icons (Boids) aligned with text glyphs and labels. */
+.element-symbol { display: flex; align-items: center; justify-content: center; height: 1em; font: min(30px, var(--column) * .5)/1 monospace; }
+.element-symbol svg { display: block; width: 1em; height: 1em; }
+.element-symbol .icon-bird { fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.element-symbol .icon-fish { fill: currentColor; stroke: none; }
+.element-choice.phase-locked .element-symbol { font-weight: 1000; -webkit-text-stroke: .7px currentColor; }
+.element-name { font: min(11px, var(--column) / 5.6)/1.2 "Helvetica Neue", Helvetica, sans-serif; letter-spacing: -.01em; white-space: nowrap; color: var(--text); }
+.element-settings { flex: 1; min-height: 96px; }
+.element-choice[aria-label="Liquid N₂"] .element-name { font-size: min(11px, var(--column) / 6.2); }
+.element-note p { margin: 0; font-size: 12px; line-height: 1.6; }
+#element-properties { font: 10px/1.7 monospace; color: var(--muted); }
+
+/* Readouts and inspector, at the bottom of the controls */
+.panel-footer { margin-top: auto; padding-top: var(--group); display: flex; flex-direction: column; gap: 4px; }
+.telemetry, .debug-readout { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 0; font: 10px/1.5 monospace; color: var(--muted); }
+.particle-inspector { min-height: 76px; gap: 2px; line-height: 1.5; }
+#inspected-name { display: block; font-weight: 400; min-height: 20px; }
+#inspected-properties { margin: 0; min-height: 30px; color: var(--muted); font: 10px/1.6 monospace; }
+@media (max-width: 1100px) { .apparatus { --panel-min: 176px; --gap: 24px; } }
+@media (max-width: 850px) {
+  .simian-page .page { height: auto; min-height: 100svh; }
+  .apparatus { container-type: normal; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: auto auto; gap: 42px 26px; }
+  .world-frame { grid-column: 1 / -1; grid-row: 1; width: min(100%, 48svh); }
+  .instrument-panel { grid-column: 1; grid-row: 2; justify-self: stretch; width: auto; }
+  .element-panel { grid-column: 2; grid-row: 2; justify-self: stretch; width: auto; }
+  .element-grid { --columns: 3; }
+  .element-settings { min-height: 72px; }
+}
+@media (max-width: 620px) {
+  .simian-page .page { padding: 0 22px; }
+  .laboratory { padding-top: 20px; }
+  .lab-heading { margin-bottom: 25px; }
+  .apparatus { column-gap: 20px; }
+  .element-grid { --columns: 3; }
+}
+@media (pointer: coarse) { .instrument-panel, .element-panel { --control: 40px; } .phase-control { min-height: 40px; } .slider-control input { height: 36px; } }
+@media (max-width: 350px) { .element-grid { --columns: 2; } }
+/* Shorter desktop windows keep the type size but tighten the rhythm. */
+@media (min-width: 851px) and (max-height: 860px) {
+  .instrument-panel, .element-panel { --row: 6px; --group: 12px; --control: 24px; }
+  .element-choice { min-height: 52px; padding: 4px 0 6px; gap: 4px; }
+  .element-settings { min-height: 84px; }
+  .particle-inspector { min-height: 60px; }
+}
+/* Preserve readable controls instead of clipping on short windows or zoom. */
+/* The panels need about 590px; below a ~780px viewport, the page scrolls. */
+@media (min-width: 851px) and (max-height: 780px) {
+  .simian-page .page { height: auto; min-height: 100svh; }
+  .apparatus { min-height: 590px; flex: none; }
+}

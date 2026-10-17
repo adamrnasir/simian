@@ -1,0 +1,18 @@
+{
+  "name": "simian",
+  "version": "1.0.0",
+  "description": "A small laboratory for matter, heat, and unexpected behavior.",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/",
+    "sync-web": "scripts/sync-web.sh"
+  },
+  "devDependencies": {
+    "electron": "44.7.2"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

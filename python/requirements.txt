@@ -1,0 +1,4 @@
+numpy>=2.0
+numba>=0.60
+PySide6-Essentials>=6.7
+pytest>=8

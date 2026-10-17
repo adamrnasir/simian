@@ -1,0 +1,50 @@
+/* The subset of the site's styles.css that Simian depends on: theme tokens,
+   page frame, grain, headings, and the theme toggle. */
+:root {
+  color-scheme: light;
+  --background: #f5f4f0;
+  --text: #30322f;
+  --muted: #70736b;
+  --accent: #859079;
+  --rule: #393e3024;
+  --wash-one: #dfdbe02b;
+  --wash-two: #e6ddca38;
+  --grain-opacity: .09;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: var(--text);
+  background: var(--background);
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #080909;
+  --text: #e2e3dc;
+  --muted: #a4a79d;
+  --accent: #a4af98;
+  --rule: #d6dcc624;
+  --wash-one: #46404b0c;
+  --wash-two: #53533c08;
+  --grain-opacity: .085;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 280px; }
+body::before { content: ""; position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 14% 43%, var(--wash-one), transparent 55%), radial-gradient(ellipse at 85% 65%, var(--wash-two), transparent 55%); }
+body::after { content: ""; position: fixed; inset: 0; opacity: var(--grain-opacity); pointer-events: none; background-image: url("grain.svg"); }
+button:focus-visible { outline: 1px solid var(--accent); outline-offset: 7px; }
+svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1; flex-shrink: 0; }
+.page { position: relative; z-index: 1; max-width: 1352px; min-height: 100svh; margin: auto; padding: 0 76px; display: flex; flex-direction: column; overflow-x: clip; }
+h1 { margin: 0; line-height: 1; font-weight: 400; }
+h2, h3 { font: inherit; margin: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.theme-toggle { display: inline-grid; place-items: center; width: 32px; height: 36px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.theme-toggle[hidden] { display: inline-grid; }
+:root:not([data-theme]) .theme-toggle[hidden] { visibility: hidden; }
+.theme-toggle:hover { color: var(--text); }
+.theme-toggle svg { width: 19px; height: 19px; }
+@media (max-width: 900px) { .page { padding: 0 36px; } }
+@media (max-width: 620px) { .page { padding: 0 26px; } }
+
+/* Without the site header, the heading carries the theme toggle at the right. */
+.simian-app .laboratory { padding-top: 36px; }
+.simian-app .lab-heading .theme-toggle { position: absolute; right: 0; top: -3px; }
